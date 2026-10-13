@@ -3,6 +3,13 @@
   hosts: localhost
   connection: local
   gather_facts: false
+  # Semaphore passes the environment's variables as extra vars; Terraform's azurerm
+  # provider reads them from the process environment.
+  environment:
+    ARM_CLIENT_ID: "{{ ARM_CLIENT_ID }}"
+    ARM_CLIENT_SECRET: "{{ ARM_CLIENT_SECRET }}"
+    ARM_SUBSCRIPTION_ID: "{{ ARM_SUBSCRIPTION_ID }}"
+    ARM_TENANT_ID: "{{ ARM_TENANT_ID }}"
   vars:
     tf_dir: "{{ playbook_dir }}/../terraform"
     tf_state: "{{ tf_state_dir | default('/var/lib/semaphore/tfstate') }}/{{ lab_name | default('avd-lab') }}.tfstate"
