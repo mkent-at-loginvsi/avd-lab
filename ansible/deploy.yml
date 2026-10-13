@@ -1,0 +1,109 @@
+---
+# Semaphore wrapper: replaces Lab Manager's "terraform apply -> read
+# ansible_inventory output -> run site.yml" flow in a single task.
+- name: Provision Azure infrastructure with Terraform
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    tf_dir: "{{ playbook_dir }}/../terraform"
+    tf_state: "{{ tf_state_dir | default('/var/lib/semaphore/tfstate') }}/{{ lab_name | default('avd-lab') }}.tfstate"
+    tf_tags:
+      purpose: "{{ purpose | default('avd-lab') }}"
+      managed_by: semaphore
+  tasks:
+    - name: Ensure the state directory exists
+      ansible.builtin.file:
+        path: "{{ tf_state | dirname }}"
+        state: directory
+        mode: "0700"
+
+    - name: Write Terraform variables file
+      ansible.builtin.copy:
+        dest: "{{ tf_dir }}/lab.auto.tfvars.json"
+        mode: "0600"
+        content: "{{ tf_vars | to_nice_json }}"
+      no_log: true
+      vars:
+        tf_vars:
+          location: "{{ location | default('eastus') }}"
+          domain_name: "{{ domain_name | default('corp.labmgr.local') }}"
+          admin_username: "{{ admin_username | default('labadmin') }}"
+          admin_password: "{{ admin_password }}"
+          admin_source_cidr: "{{ admin_source_cidr }}"
+          vm_size_dc: "{{ vm_size_dc | default('Standard_B2ms') }}"
+          vm_size_session_host: "{{ vm_size_session_host | default('Standard_D2s_v5') }}"
+          session_host_count: "{{ session_host_count | default(2) | int }}"
+          avd_user_object_id: "{{ avd_user_object_id | default('') }}"
+          test_user_count: "{{ test_user_count | default(50) | int }}"
+          test_user_password: "{{ test_user_password }}"
+          labmgr_tags: "{{ tf_tags }}"
+
+    - name: terraform init
+      ansible.builtin.command:
+        cmd: terraform init -input=false -no-color
+        chdir: "{{ tf_dir }}"
+      changed_when: false
+
+    - name: terraform apply
+      ansible.builtin.command:
+        cmd: terraform apply -auto-approve -input=false -no-color -state={{ tf_state }}
+        chdir: "{{ tf_dir }}"
+
+    - name: Read the ansible_inventory output
+      ansible.builtin.command:
+        cmd: terraform output -json -state={{ tf_state }} ansible_inventory
+        chdir: "{{ tf_dir }}"
+      register: tf_inventory
+      changed_when: false
+      no_log: true
+
+    - name: Add the domain controller to the in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ item.key }}"
+        groups: domain_controllers
+        ansible_host: "{{ item.value.ansible_host }}"
+        ansible_user: "{{ item.value.ansible_user }}"
+        ansible_password: "{{ item.value.ansible_password }}"
+        ansible_connection: winrm
+        ansible_winrm_transport: basic
+        ansible_port: 5985
+        ansible_winrm_server_cert_validation: ignore
+        domain_name: "{{ inv.all.vars.domain_name }}"
+        avd_registration_token: "{{ inv.all.vars.avd_registration_token }}"
+      loop: "{{ inv.all.children.domain_controllers.hosts | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars:
+        inv: "{{ tf_inventory.stdout | from_json }}"
+      no_log: true
+
+    - name: Add session hosts to the in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ item.key }}"
+        groups: session_hosts
+        ansible_host: "{{ item.value.ansible_host }}"
+        ansible_user: "{{ item.value.ansible_user }}"
+        ansible_password: "{{ item.value.ansible_password }}"
+        ansible_connection: winrm
+        ansible_winrm_transport: basic
+        ansible_port: 5985
+        ansible_winrm_server_cert_validation: ignore
+        domain_name: "{{ inv.all.vars.domain_name }}"
+        avd_registration_token: "{{ inv.all.vars.avd_registration_token }}"
+      loop: "{{ inv.all.children.session_hosts.hosts | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars:
+        inv: "{{ tf_inventory.stdout | from_json }}"
+      no_log: true
+
+    - name: Wait for WinRM on every VM
+      ansible.builtin.wait_for:
+        host: "{{ hostvars[item].ansible_host }}"
+        port: 5985
+        timeout: 900
+      loop: "{{ groups['domain_controllers'] + groups['session_hosts'] }}"
+
+- name: Configure AD and AVD session hosts
+  ansible.builtin.import_playbook: site.yml

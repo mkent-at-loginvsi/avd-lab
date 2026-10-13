@@ -1,0 +1,99 @@
+---
+- name: Promote the domain controller
+  hosts: domain_controllers
+  gather_facts: false
+  tasks:
+    - name: Install AD-DS and DNS Windows features
+      ansible.windows.win_feature:
+        name:
+          - AD-Domain-Services
+          - DNS
+        include_management_tools: true
+        state: present
+
+    - name: Create the new forest and domain
+      microsoft.ad.domain:
+        dns_domain_name: "{{ domain_name }}"
+        safe_mode_password: "{{ ansible_password }}"
+        reboot: true
+
+- name: Create AD test accounts for load testing
+  hosts: domain_controllers
+  gather_facts: false
+  tasks:
+    - name: Create the SessionDesktop AD group
+      microsoft.ad.group:
+        name: SessionDesktop
+        scope: global
+        category: security
+        state: present
+
+    - name: Create test user accounts
+      microsoft.ad.user:
+        name: "testuser{{ '%02d' | format(item) }}"
+        upn: "testuser{{ '%02d' | format(item) }}@{{ domain_name }}"
+        password: "{{ test_user_password }}"
+        password_never_expires: true
+        enabled: true
+        state: present
+        groups:
+          add:
+            - SessionDesktop
+      loop: "{{ range(1, test_user_count | int + 1) | list }}"
+
+- name: Join session hosts to the domain
+  hosts: session_hosts
+  gather_facts: false
+  tasks:
+    - name: Wait for the domain controller's DNS to be reachable
+      ansible.windows.win_command: "nslookup {{ domain_name }}"
+      register: dns_check
+      retries: 20
+      delay: 15
+      until: dns_check.rc == 0
+
+    - name: Join the domain
+      microsoft.ad.membership:
+        dns_domain_name: "{{ domain_name }}"
+        domain_admin_user: "{{ ansible_user }}@{{ domain_name }}"
+        domain_admin_password: "{{ ansible_password }}"
+        state: domain
+        reboot: true
+
+    - name: Grant the SessionDesktop group RDP access to the session host
+      ansible.windows.win_group_membership:
+        name: Remote Desktop Users
+        members:
+          - "SessionDesktop@{{ domain_name }}"
+        state: present
+
+- name: Install and register the AVD agent on session hosts
+  hosts: session_hosts
+  gather_facts: false
+  vars:
+    # Microsoft's durable direct-download links for the AVD agent installers,
+    # documented at https://learn.microsoft.com/azure/virtual-desktop/session-host-configuration
+    avd_bootloader_url: "https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RWrxrH"
+    avd_agent_url: "https://query.prod.cms.rt.microsoft.com/cms/api/am/binary/RWrmXv"
+  tasks:
+    - name: Download the AVD Boot Loader installer
+      ansible.windows.win_get_url:
+        url: "{{ avd_bootloader_url }}"
+        dest: "C:\\Windows\\Temp\\AVDBootLoader.msi"
+
+    - name: Install the AVD Boot Loader
+      ansible.windows.win_package:
+        path: "C:\\Windows\\Temp\\AVDBootLoader.msi"
+        arguments: "/quiet /norestart"
+        state: present
+
+    - name: Download the AVD Agent installer
+      ansible.windows.win_get_url:
+        url: "{{ avd_agent_url }}"
+        dest: "C:\\Windows\\Temp\\AVDAgent.msi"
+
+    - name: Install and register the AVD Agent with the host pool
+      ansible.windows.win_package:
+        path: "C:\\Windows\\Temp\\AVDAgent.msi"
+        arguments: "/quiet /norestart REGISTRATIONTOKEN={{ avd_registration_token }}"
+        state: present

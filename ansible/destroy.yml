@@ -1,0 +1,32 @@
+---
+- name: Destroy the AVD lab
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    tf_dir: "{{ playbook_dir }}/../terraform"
+    tf_state: "{{ tf_state_dir | default('/var/lib/semaphore/tfstate') }}/{{ lab_name | default('avd-lab') }}.tfstate"
+  tasks:
+    - name: Write Terraform variables file
+      ansible.builtin.copy:
+        dest: "{{ tf_dir }}/lab.auto.tfvars.json"
+        mode: "0600"
+        content: "{{ tf_vars | to_nice_json }}"
+      no_log: true
+      vars:
+        tf_vars:
+          admin_password: "{{ admin_password }}"
+          admin_source_cidr: "{{ admin_source_cidr | default('0.0.0.0/32') }}"
+          test_user_password: "{{ test_user_password | default('unused') }}"
+          session_host_count: "{{ session_host_count | default(2) | int }}"
+
+    - name: terraform init
+      ansible.builtin.command:
+        cmd: terraform init -input=false -no-color
+        chdir: "{{ tf_dir }}"
+      changed_when: false
+
+    - name: terraform destroy
+      ansible.builtin.command:
+        cmd: terraform destroy -auto-approve -input=false -no-color -state={{ tf_state }}
+        chdir: "{{ tf_dir }}"
