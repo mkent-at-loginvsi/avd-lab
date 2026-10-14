@@ -33,7 +33,7 @@ variables:
   - name: vm_size_dc
     type: string
     description: VM size for the domain controller
-    default: "Standard_B2ms"
+    default: "Standard_D2s_v4"
 
   - name: vm_size_session_host
     type: string

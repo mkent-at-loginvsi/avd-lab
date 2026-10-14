@@ -30,7 +30,7 @@ variable "admin_source_cidr" {
 variable "vm_size_dc" {
   type        = string
   description = "VM size for the domain controller"
-  default     = "Standard_B2ms"
+  default     = "Standard_D2s_v4"
 }
 
 variable "vm_size_session_host" {
