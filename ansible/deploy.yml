@@ -39,7 +39,7 @@
           admin_password: "{{ admin_password }}"
           admin_source_cidr: "{{ admin_source_cidr }}"
           vm_size_dc: "{{ vm_size_dc | default('Standard_B2ms') }}"
-          vm_size_session_host: "{{ vm_size_session_host | default('Standard_D2s_v5') }}"
+          vm_size_session_host: "{{ vm_size_session_host | default('Standard_D2s_v4') }}"
           session_host_count: "{{ session_host_count | default(2) | int }}"
           avd_user_object_id: "{{ avd_user_object_id | default('') }}"
           deploy_domain_controller: "{{ deploy_domain_controller | default(false) | bool }}"

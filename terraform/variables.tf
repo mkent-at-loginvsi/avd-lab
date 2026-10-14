@@ -36,7 +36,7 @@ variable "vm_size_dc" {
 variable "vm_size_session_host" {
   type        = string
   description = "VM size for each AVD session host"
-  default     = "Standard_D2s_v5"
+  default     = "Standard_D2s_v4"
 }
 
 variable "session_host_count" {
