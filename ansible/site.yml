@@ -1,7 +1,8 @@
----
-# The domain controller plays only run when deploy_domain_controller=true (the
-# domain_controllers group is empty otherwise). Session hosts are Entra-joined
-# by Terraform (AADLoginForWindows), so they are not domain-joined here.
+# Two modes, picked by deploy_domain_controller:
+#   false - session hosts are Entra-joined by Terraform (AADLoginForWindows); only the AVD agent
+#           is installed here, and the domain_controllers group is empty.
+#   true  - a DC is promoted, the session hosts join its domain, and Cloud Sync pushes the AD test
+#           users to Entra so they can sign in to AVD (Entra first, then the Windows prompt).
 - name: Promote the domain controller
   hosts: domain_controllers
   gather_facts: false
@@ -24,6 +25,16 @@
   hosts: domain_controllers
   gather_facts: false
   tasks:
+    # Users must carry the Entra tenant's domain as their UPN suffix so the synced Entra identity
+    # signs in with the same name (e.g. testuser01@<tenant>.onmicrosoft.com).
+    - name: Add the Entra tenant domain as a UPN suffix of the forest
+      ansible.windows.win_powershell:
+        script: |
+          $suffix = '{{ entra_domain }}'
+          if ((Get-ADForest).UPNSuffixes -notcontains $suffix) {
+            Set-ADForest -Identity (Get-ADForest) -UPNSuffixes @{Add = $suffix}
+          }
+
     - name: Create the SessionDesktop AD group
       microsoft.ad.group:
         name: SessionDesktop
@@ -34,7 +45,7 @@
     - name: Create test user accounts
       microsoft.ad.user:
         name: "testuser{{ '%02d' | format(item) }}"
-        upn: "testuser{{ '%02d' | format(item) }}@{{ domain_name }}"
+        upn: "testuser{{ '%02d' | format(item) }}@{{ entra_domain }}"
         password: "{{ test_user_password }}"
         password_never_expires: true
         enabled: true
@@ -43,6 +54,27 @@
           add:
             - SessionDesktop
       loop: "{{ range(1, test_user_count | int + 1) | list }}"
+      no_log: true
+
+- name: Join the session hosts to the domain
+  hosts: session_hosts
+  gather_facts: false
+  tasks:
+    - name: Point DNS at the domain controller
+      ansible.windows.win_dns_client:
+        adapter_names: "*"
+        dns_servers:
+          - "{{ dc_private_ip }}"
+      when: groups['domain_controllers'] | length > 0
+
+    - name: Join the domain
+      microsoft.ad.membership:
+        dns_domain_name: "{{ domain_name }}"
+        domain_admin_user: "{{ ansible_user }}@{{ domain_name }}"
+        domain_admin_password: "{{ ansible_password }}"
+        state: domain
+        reboot: true
+      when: groups['domain_controllers'] | length > 0
 
 - name: Install and register the AVD agent on session hosts
   hosts: session_hosts
@@ -74,3 +106,6 @@
         path: "C:\\Windows\\Temp\\AVDAgent.msi"
         arguments: "/quiet /norestart REGISTRATIONTOKEN={{ avd_registration_token }}"
         state: present
+
+- name: Sync the AD users to Entra ID with Cloud Sync
+  ansible.builtin.import_playbook: cloudsync.yml

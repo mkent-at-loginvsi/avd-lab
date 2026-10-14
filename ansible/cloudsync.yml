@@ -1,0 +1,79 @@
+# Domain-controller mode only: installs the Microsoft Entra Cloud Sync provisioning agent on the
+# DC, configures the AD -> Entra sync (with password hash sync) through Graph, waits for the test
+# users to appear in Entra and adds them to the cloud group that holds the AVD role assignments.
+# Needs entra_admin_upn / entra_admin_password (a Hybrid Identity or Global Administrator without
+# MFA), prompted at run time.
+- name: Enable directory sync for the tenant
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  environment: &graph_env
+    ENTRA_TENANT_ID: "{{ ARM_TENANT_ID }}"
+    ENTRA_ADMIN_UPN: "{{ entra_admin_upn | default('') }}"
+    ENTRA_ADMIN_PASSWORD: "{{ entra_admin_password | default('') }}"
+  tasks:
+    - name: Enable the tenant's directory-sync flag
+      ansible.builtin.command: python3 {{ playbook_dir }}/../scripts/cloudsync_graph.py prep
+      when: groups['domain_controllers'] | default([]) | length > 0
+      changed_when: false
+
+- name: Install and register the Cloud Sync provisioning agent
+  hosts: domain_controllers
+  gather_facts: false
+  vars:
+    agent_url: "https://download.msappproxy.net/Subscription/d3c8b69d-6bf7-42be-a529-3fe9c2e70c90/Connector/provisioningAgentInstaller"
+    agent_dir: "C:\\Program Files\\Microsoft Azure AD Connect Provisioning Agent"
+  tasks:
+    - name: Download the provisioning agent installer
+      ansible.windows.win_get_url:
+        url: "{{ agent_url }}"
+        dest: "C:\\Windows\\Temp\\AADConnectProvisioningAgentSetup.exe"
+
+    - name: Install the provisioning agent silently
+      ansible.windows.win_powershell:
+        script: |
+          if (-not (Test-Path '{{ agent_dir }}\Microsoft.CloudSync.PowerShell.dll')) {
+            $p = Start-Process 'C:\Windows\Temp\AADConnectProvisioningAgentSetup.exe' '/quiet' -PassThru -Wait
+            if ($p.ExitCode -notin 0, 3010) { throw "installer exit code $($p.ExitCode)" }
+          }
+          if (-not (Test-Path '{{ agent_dir }}\Microsoft.CloudSync.PowerShell.dll')) {
+            throw 'provisioning agent files not found after install'
+          }
+
+    - name: Register the agent, create the gMSA and add the domain
+      ansible.windows.win_powershell:
+        script: |
+          $ErrorActionPreference = 'Stop'
+          if (Test-Path 'C:\Windows\Temp\cloudsync.registered') { return }
+          Import-Module '{{ agent_dir }}\Microsoft.CloudSync.PowerShell.dll'
+          $entra = New-Object System.Management.Automation.PSCredential('{{ entra_admin_upn }}',
+            (ConvertTo-SecureString '{{ entra_admin_password }}' -AsPlainText -Force))
+          $dom = New-Object System.Management.Automation.PSCredential('{{ ansible_user }}@{{ domain_name }}',
+            (ConvertTo-SecureString '{{ ansible_password }}' -AsPlainText -Force))
+          Connect-AADCloudSyncAzureAD -Credential $entra
+          Add-AADCloudSyncGMSA -Credential $dom
+          Add-AADCloudSyncADDomain -DomainName '{{ domain_name }}' -Credential $dom
+          Restart-Service -Name AADConnectProvisioningAgent
+          New-Item 'C:\Windows\Temp\cloudsync.registered' -ItemType File | Out-Null
+      no_log: true
+
+- name: Configure the sync, wait for the users and grant them AVD access
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  environment:
+    <<: *graph_env
+    AD_DOMAIN: "{{ hostvars[groups['domain_controllers'][0]].domain_name | default('') if groups['domain_controllers'] | default([]) | length > 0 else '' }}"
+    ENTRA_DOMAIN: "{{ hostvars[groups['domain_controllers'][0]].entra_domain | default('') if groups['domain_controllers'] | default([]) | length > 0 else '' }}"
+    ENTRA_GROUP_ID: "{{ hostvars[groups['domain_controllers'][0]].entra_group_object_id | default('') if groups['domain_controllers'] | default([]) | length > 0 else '' }}"
+    TEST_USER_COUNT: "{{ test_user_count | default(50) }}"
+  tasks:
+    - name: Create the sync configuration, enable password hash sync and start it
+      ansible.builtin.command: python3 {{ playbook_dir }}/../scripts/cloudsync_graph.py configure
+      when: groups['domain_controllers'] | default([]) | length > 0
+      changed_when: true
+
+    - name: Wait for the synced users and add them to the AVD group
+      ansible.builtin.command: python3 {{ playbook_dir }}/../scripts/cloudsync_graph.py assign
+      when: groups['domain_controllers'] | default([]) | length > 0
+      changed_when: true

@@ -78,6 +78,9 @@
         ansible_port: 5985
         ansible_winrm_server_cert_validation: ignore
         domain_name: "{{ inv.all.vars.domain_name }}"
+        entra_domain: "{{ inv.all.vars.entra_domain }}"
+        dc_private_ip: "{{ inv.all.vars.dc_private_ip }}"
+        entra_group_object_id: "{{ inv.all.vars.entra_group_object_id }}"
         avd_registration_token: "{{ inv.all.vars.avd_registration_token }}"
       loop: "{{ inv.all.children.domain_controllers.hosts | dict2items }}"
       loop_control:
@@ -98,6 +101,9 @@
         ansible_port: 5985
         ansible_winrm_server_cert_validation: ignore
         domain_name: "{{ inv.all.vars.domain_name }}"
+        entra_domain: "{{ inv.all.vars.entra_domain }}"
+        dc_private_ip: "{{ inv.all.vars.dc_private_ip }}"
+        entra_group_object_id: "{{ inv.all.vars.entra_group_object_id }}"
         avd_registration_token: "{{ inv.all.vars.avd_registration_token }}"
       loop: "{{ inv.all.children.session_hosts.hosts | dict2items }}"
       loop_control:
@@ -113,5 +119,5 @@
         timeout: 900
       loop: "{{ groups.get('domain_controllers', []) + groups['session_hosts'] }}"
 
-- name: Configure the optional domain controller and register the AVD session hosts
+- name: Configure the optional domain controller, join and register the AVD session hosts
   ansible.builtin.import_playbook: site.yml

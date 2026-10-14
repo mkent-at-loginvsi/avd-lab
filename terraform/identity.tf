@@ -1,11 +1,15 @@
-# Cloud-only Entra ID test users that can sign in to AVD (web client / Windows App).
+# Entra ID identities that can sign in to AVD (web client / Windows App): cloud-only test users in
+# Entra-join mode, or AD users synced by Cloud Sync when deploy_domain_controller is true.
 
 data "azuread_domains" "initial" {
   only_initial = true
 }
 
 locals {
-  entra_domain = data.azuread_domains.initial.domains[0].domain_name
+  # Cloud-only users are created only in Entra-join mode. With the domain controller the
+  # users live in AD and are synced to Entra by Cloud Sync (see ansible/cloudsync.yml).
+  create_cloud_users = !var.deploy_domain_controller
+  entra_domain       = data.azuread_domains.initial.domains[0].domain_name
   test_users = {
     for i in range(var.test_user_count) :
     format("testuser%02d", i + 1) => format("testuser%02d@%s", i + 1, local.entra_domain)
@@ -19,7 +23,7 @@ resource "azuread_group" "session_desktop" {
 }
 
 resource "azuread_user" "test" {
-  for_each              = local.test_users
+  for_each              = local.create_cloud_users ? local.test_users : {}
   user_principal_name   = each.value
   display_name          = each.key
   mail_nickname         = each.key
@@ -41,6 +45,7 @@ resource "azurerm_role_assignment" "group_desktop" {
 }
 
 resource "azurerm_role_assignment" "group_vm_login" {
+  count                = local.create_cloud_users ? 1 : 0
   scope                = azurerm_resource_group.lab.id
   role_definition_name = "Virtual Machine User Login"
   principal_id         = azuread_group.session_desktop.object_id
@@ -55,7 +60,7 @@ resource "azurerm_role_assignment" "avd_user" {
 }
 
 resource "azurerm_role_assignment" "avd_user_vm_login" {
-  count                = var.avd_user_object_id != "" ? 1 : 0
+  count                = var.avd_user_object_id != "" && local.create_cloud_users ? 1 : 0
   scope                = azurerm_resource_group.lab.id
   role_definition_name = "Virtual Machine User Login"
   principal_id         = var.avd_user_object_id

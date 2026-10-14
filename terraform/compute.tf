@@ -145,9 +145,10 @@ resource "azurerm_virtual_machine_extension" "session_host_winrm" {
   })
 }
 
-# Entra ID join, so the session hosts accept Entra identities (cloud test users).
+# Entra ID join, so the session hosts accept Entra identities (cloud test users). Skipped with
+# the domain controller: the hosts are domain-joined by Ansible instead.
 resource "azurerm_virtual_machine_extension" "session_host_aad" {
-  count                      = var.session_host_count
+  count                      = local.create_cloud_users ? var.session_host_count : 0
   name                       = "AADLoginForWindows"
   virtual_machine_id         = azurerm_windows_virtual_machine.session_host[count.index].id
   publisher                  = "Microsoft.Azure.ActiveDirectory"

@@ -65,7 +65,7 @@ variable "test_user_password" {
 
 variable "deploy_domain_controller" {
   type        = bool
-  description = "Also deploy a Windows Server domain controller running a standalone AD forest (session hosts stay Entra-joined)"
+  description = "Also deploy a Windows Server domain controller running a standalone AD forest whose session hosts are domain-joined and whose users are synced to Entra by Cloud Sync; when false the hosts are Entra-joined with cloud test users"
   default     = false
 }
 

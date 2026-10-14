@@ -40,6 +40,9 @@ output "ansible_inventory" {
       }
       vars = {
         domain_name            = var.domain_name
+        entra_domain           = local.entra_domain
+        dc_private_ip          = local.dc_private_ip
+        entra_group_object_id  = azuread_group.session_desktop.object_id
         avd_registration_token = azurerm_virtual_desktop_host_pool_registration_info.lab.token
       }
     }

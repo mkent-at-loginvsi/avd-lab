@@ -7,8 +7,10 @@ resource "azurerm_virtual_desktop_host_pool" "lab" {
   maximum_sessions_allowed = 10
   validate_environment     = false
   start_vm_on_connect      = false
-  custom_rdp_properties    = "targetisaadjoined:i:1;enablerdsaadauth:i:1;"
-  tags                     = var.labmgr_tags
+  # Entra-join: single sign-on to the Entra-joined host. Domain-joined: no SSO, so the user gets
+  # the Windows Security prompt and signs in with their AD credentials.
+  custom_rdp_properties = var.deploy_domain_controller ? "enablecredsspsupport:i:1;" : "targetisaadjoined:i:1;enablerdsaadauth:i:1;"
+  tags                  = var.labmgr_tags
 }
 
 resource "azurerm_virtual_desktop_host_pool_registration_info" "lab" {
