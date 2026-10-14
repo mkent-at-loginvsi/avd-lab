@@ -21,10 +21,22 @@ echo "Creating service principal '${NAME}' (Contributor + User Access Administra
 # Contributor creates the resources; the lab template also creates an
 # azurerm_role_assignment (Desktop Virtualization User) when avd_user_object_id is set,
 # which requires User Access Administrator (or Owner).
-read -r CLIENT_ID CLIENT_SECRET < <(
-  az ad sp create-for-rbac --name "$NAME" --role Contributor --scopes "$SCOPE" \
-    --query '[appId,password]' -o tsv
-)
+# Reuse the service principal if it already exists (rerun-safe): just issue a new secret.
+CLIENT_ID=$(az ad sp list --display-name "$NAME" --query '[0].appId' -o tsv)
+if [[ -n "$CLIENT_ID" ]]; then
+  echo "Service principal '${NAME}' already exists (${CLIENT_ID}); resetting its secret." >&2
+  CLIENT_SECRET=$(az ad sp credential reset --id "$CLIENT_ID" --query password -o tsv)
+else
+  # tsv prints each list element on its own line, so read them one at a time.
+  { read -r CLIENT_ID; read -r CLIENT_SECRET; } < <(
+    az ad sp create-for-rbac --name "$NAME" --role Contributor --scopes "$SCOPE" \
+      --query '[appId,password]' -o tsv
+  )
+fi
+[[ -n "$CLIENT_ID" && -n "$CLIENT_SECRET" ]] || { echo "Failed to obtain client id/secret" >&2; exit 1; }
+
+# Idempotent if the assignment already exists.
+az role assignment create --assignee "$CLIENT_ID" --role Contributor --scope "$SCOPE" -o none
 az role assignment create --assignee "$CLIENT_ID" \
   --role "User Access Administrator" --scope "$SCOPE" -o none
 
