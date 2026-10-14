@@ -2,3 +2,5 @@
 *.tfstate*
 .terraform/
 lab.auto.tfvars.json
+.env
+.env.*
