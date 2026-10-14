@@ -16,7 +16,7 @@ TENANT_ID=$(az account show --query tenantId -o tsv)
 SCOPE="/subscriptions/${SUB_ID}"
 
 echo "Subscription: ${SUB_ID}"
-echo "Creating service principal '${NAME}' (Contributor + User Access Administrator on ${SCOPE})..." >&2
+echo "Creating service principal '${NAME}' (Contributor + User Access Administrator on ${SCOPE}, plus Graph permissions)..." >&2
 
 # Contributor creates the resources; the lab template also creates an
 # azurerm_role_assignment (Desktop Virtualization User) when avd_user_object_id is set,
@@ -39,6 +39,18 @@ fi
 az role assignment create --assignee "$CLIENT_ID" --role Contributor --scope "$SCOPE" -o none
 az role assignment create --assignee "$CLIENT_ID" \
   --role "User Access Administrator" --scope "$SCOPE" -o none
+
+# Microsoft Graph application permissions so Terraform can create the Entra ID test
+# users and group: User.ReadWrite.All, Group.ReadWrite.All, Directory.Read.All.
+GRAPH=00000003-0000-0000-c000-000000000000
+az ad app permission add --id "$CLIENT_ID" --api "$GRAPH" --api-permissions \
+  741f803b-c850-494e-b5df-cde7c675a1ca=Role \
+  62a82d76-70ea-41e2-9197-370581804d09=Role \
+  7ab1d382-f21e-4acd-a863-ba3e13f7da61=Role -o none
+if ! az ad app permission admin-consent --id "$CLIENT_ID" 2>/dev/null; then
+  echo "WARNING: admin consent failed. A Global Administrator or Privileged Role Administrator must run:" >&2
+  echo "  az ad app permission admin-consent --id ${CLIENT_ID}" >&2
+fi
 
 cat <<OUT
 

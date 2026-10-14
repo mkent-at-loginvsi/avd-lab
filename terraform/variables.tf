@@ -47,20 +47,26 @@ variable "session_host_count" {
 
 variable "avd_user_object_id" {
   type        = string
-  description = "Entra ID object ID (user or group) to grant access to the published desktop; leave blank to skip role assignment"
+  description = "Additional Entra ID object ID (user or group) to grant the published desktop and VM login to; leave blank to skip"
   default     = ""
 }
 
 variable "test_user_count" {
   type        = number
-  description = "Number of AD test accounts to create; not used by Terraform, only declared so Lab Manager can pass it through to Ansible"
+  description = "Number of Entra ID test users to create (testuser01, testuser02, ...); also the number of AD accounts if the domain controller is deployed"
   default     = 50
 }
 
 variable "test_user_password" {
   type        = string
-  description = "Shared password for the AD test accounts; not used by Terraform, only declared so Lab Manager can pass it through to Ansible"
+  description = "Shared password for the Entra ID test users (must meet Entra password complexity); also used for the AD accounts when the DC is deployed"
   sensitive   = true
+}
+
+variable "deploy_domain_controller" {
+  type        = bool
+  description = "Also deploy a Windows Server domain controller running a standalone AD forest (session hosts stay Entra-joined)"
+  default     = false
 }
 
 variable "labmgr_tags" {

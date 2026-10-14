@@ -25,6 +25,8 @@
           admin_password: "{{ admin_password }}"
           admin_source_cidr: "{{ admin_source_cidr | default('0.0.0.0/32') }}"
           test_user_password: "{{ test_user_password | default('unused') }}"
+          deploy_domain_controller: "{{ deploy_domain_controller | default(false) | bool }}"
+          test_user_count: "{{ test_user_count | default(50) | int }}"
           session_host_count: "{{ session_host_count | default(2) | int }}"
 
     - name: terraform init

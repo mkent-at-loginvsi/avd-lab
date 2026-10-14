@@ -6,6 +6,7 @@ locals {
   vnet_address_space    = "10.60.0.0/16"
   subnet_address_prefix = "10.60.1.0/24"
   dc_private_ip         = cidrhost(local.subnet_address_prefix, 4)
+  dc_count              = var.deploy_domain_controller ? 1 : 0
   session_host_ips      = [for i in range(var.session_host_count) : cidrhost(local.subnet_address_prefix, 10 + i)]
 }
 
@@ -20,7 +21,6 @@ resource "azurerm_virtual_network" "lab" {
   location            = azurerm_resource_group.lab.location
   resource_group_name = azurerm_resource_group.lab.name
   address_space       = [local.vnet_address_space]
-  dns_servers         = [local.dc_private_ip]
   tags                = var.labmgr_tags
 }
 

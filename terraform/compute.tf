@@ -7,9 +7,10 @@ locals {
   ])
 }
 
-# --- Domain controller ---
+# --- Domain controller (optional, standalone AD forest; session hosts are Entra-joined, not domain-joined) ---
 
 resource "azurerm_public_ip" "dc" {
+  count               = local.dc_count
   name                = "pip-dc-${random_id.suffix.hex}"
   location            = azurerm_resource_group.lab.location
   resource_group_name = azurerm_resource_group.lab.name
@@ -19,6 +20,7 @@ resource "azurerm_public_ip" "dc" {
 }
 
 resource "azurerm_network_interface" "dc" {
+  count               = local.dc_count
   name                = "nic-dc-${random_id.suffix.hex}"
   location            = azurerm_resource_group.lab.location
   resource_group_name = azurerm_resource_group.lab.name
@@ -29,11 +31,12 @@ resource "azurerm_network_interface" "dc" {
     subnet_id                     = azurerm_subnet.lab.id
     private_ip_address_allocation = "Static"
     private_ip_address            = local.dc_private_ip
-    public_ip_address_id          = azurerm_public_ip.dc.id
+    public_ip_address_id          = azurerm_public_ip.dc[0].id
   }
 }
 
 resource "azurerm_windows_virtual_machine" "dc" {
+  count                 = local.dc_count
   name                  = "vm-dc"
   computer_name         = "DC01"
   location              = azurerm_resource_group.lab.location
@@ -41,7 +44,7 @@ resource "azurerm_windows_virtual_machine" "dc" {
   size                  = var.vm_size_dc
   admin_username        = var.admin_username
   admin_password        = var.admin_password
-  network_interface_ids = [azurerm_network_interface.dc.id]
+  network_interface_ids = [azurerm_network_interface.dc[0].id]
   tags                  = var.labmgr_tags
 
   os_disk {
@@ -58,8 +61,9 @@ resource "azurerm_windows_virtual_machine" "dc" {
 }
 
 resource "azurerm_virtual_machine_extension" "dc_winrm" {
+  count                      = local.dc_count
   name                       = "enable-winrm"
-  virtual_machine_id         = azurerm_windows_virtual_machine.dc.id
+  virtual_machine_id         = azurerm_windows_virtual_machine.dc[0].id
   publisher                  = "Microsoft.Compute"
   type                       = "CustomScriptExtension"
   type_handler_version       = "1.10"
@@ -110,6 +114,10 @@ resource "azurerm_windows_virtual_machine" "session_host" {
   network_interface_ids = [azurerm_network_interface.session_host[count.index].id]
   tags                  = var.labmgr_tags
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "StandardSSD_LRS"
@@ -135,4 +143,15 @@ resource "azurerm_virtual_machine_extension" "session_host_winrm" {
   settings = jsonencode({
     commandToExecute = "powershell -ExecutionPolicy Unrestricted -NonInteractive -Command \"${local.enable_winrm_command}\""
   })
+}
+
+# Entra ID join, so the session hosts accept Entra identities (cloud test users).
+resource "azurerm_virtual_machine_extension" "session_host_aad" {
+  count                      = var.session_host_count
+  name                       = "AADLoginForWindows"
+  virtual_machine_id         = azurerm_windows_virtual_machine.session_host[count.index].id
+  publisher                  = "Microsoft.Azure.ActiveDirectory"
+  type                       = "AADLoginForWindows"
+  type_handler_version       = "2.0"
+  auto_upgrade_minor_version = true
 }

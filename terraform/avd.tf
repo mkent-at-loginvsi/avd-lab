@@ -7,6 +7,7 @@ resource "azurerm_virtual_desktop_host_pool" "lab" {
   maximum_sessions_allowed = 10
   validate_environment     = false
   start_vm_on_connect      = false
+  custom_rdp_properties    = "targetisaadjoined:i:1;enablerdsaadauth:i:1;"
   tags                     = var.labmgr_tags
 }
 
@@ -36,11 +37,4 @@ resource "azurerm_virtual_desktop_workspace" "lab" {
 resource "azurerm_virtual_desktop_workspace_application_group_association" "lab" {
   workspace_id         = azurerm_virtual_desktop_workspace.lab.id
   application_group_id = azurerm_virtual_desktop_application_group.desktop.id
-}
-
-resource "azurerm_role_assignment" "avd_user" {
-  count                = var.avd_user_object_id != "" ? 1 : 0
-  scope                = azurerm_virtual_desktop_application_group.desktop.id
-  role_definition_name = "Desktop Virtualization User"
-  principal_id         = var.avd_user_object_id
 }

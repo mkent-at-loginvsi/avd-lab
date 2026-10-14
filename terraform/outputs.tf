@@ -1,7 +1,7 @@
 locals {
   dc_host = {
-    (azurerm_windows_virtual_machine.dc.name) = {
-      ansible_host                         = azurerm_public_ip.dc.ip_address
+    for i, vm in azurerm_windows_virtual_machine.dc : vm.name => {
+      ansible_host                         = azurerm_public_ip.dc[i].ip_address
       ansible_user                         = var.admin_username
       ansible_password                     = var.admin_password
       ansible_connection                   = "winrm"
@@ -54,4 +54,9 @@ output "resource_group_name" {
 output "avd_workspace_name" {
   description = "AVD workspace name, for reference when connecting a client"
   value       = azurerm_virtual_desktop_workspace.lab.name
+}
+
+output "test_user_upns" {
+  description = "Entra ID sign-in names of the test users (all share test_user_password)"
+  value       = sort(values(local.test_users))
 }

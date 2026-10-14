@@ -1,4 +1,7 @@
 ---
+# The domain controller plays only run when deploy_domain_controller=true (the
+# domain_controllers group is empty otherwise). Session hosts are Entra-joined
+# by Terraform (AADLoginForWindows), so they are not domain-joined here.
 - name: Promote the domain controller
   hosts: domain_controllers
   gather_facts: false
@@ -40,32 +43,6 @@
           add:
             - SessionDesktop
       loop: "{{ range(1, test_user_count | int + 1) | list }}"
-
-- name: Join session hosts to the domain
-  hosts: session_hosts
-  gather_facts: false
-  tasks:
-    - name: Wait for the domain controller's DNS to be reachable
-      ansible.windows.win_command: "nslookup {{ domain_name }}"
-      register: dns_check
-      retries: 20
-      delay: 15
-      until: dns_check.rc == 0
-
-    - name: Join the domain
-      microsoft.ad.membership:
-        dns_domain_name: "{{ domain_name }}"
-        domain_admin_user: "{{ ansible_user }}@{{ domain_name }}"
-        domain_admin_password: "{{ ansible_password }}"
-        state: domain
-        reboot: true
-
-    - name: Grant the SessionDesktop group RDP access to the session host
-      ansible.windows.win_group_membership:
-        name: Remote Desktop Users
-        members:
-          - "SessionDesktop@{{ domain_name }}"
-        state: present
 
 - name: Install and register the AVD agent on session hosts
   hosts: session_hosts

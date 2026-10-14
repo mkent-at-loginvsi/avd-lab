@@ -42,6 +42,7 @@
           vm_size_session_host: "{{ vm_size_session_host | default('Standard_D2s_v5') }}"
           session_host_count: "{{ session_host_count | default(2) | int }}"
           avd_user_object_id: "{{ avd_user_object_id | default('') }}"
+          deploy_domain_controller: "{{ deploy_domain_controller | default(false) | bool }}"
           test_user_count: "{{ test_user_count | default(50) | int }}"
           test_user_password: "{{ test_user_password }}"
           labmgr_tags: "{{ tf_tags }}"
@@ -110,7 +111,7 @@
         host: "{{ hostvars[item].ansible_host }}"
         port: 5985
         timeout: 900
-      loop: "{{ groups['domain_controllers'] + groups['session_hosts'] }}"
+      loop: "{{ groups.get('domain_controllers', []) + groups['session_hosts'] }}"
 
-- name: Configure AD and AVD session hosts
+- name: Configure the optional domain controller and register the AVD session hosts
   ansible.builtin.import_playbook: site.yml
