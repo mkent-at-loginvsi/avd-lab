@@ -1,10 +1,13 @@
 ---
+# Tears down the lab with no prompts. Terraform requires every variable even on
+# destroy, so this supplies throwaway (but validation-compliant) secrets and reads
+# the real counts from the Terraform state, so they always match what is deployed.
 - name: Destroy the AVD lab
   hosts: localhost
   connection: local
   gather_facts: false
   # Semaphore passes the environment's variables as extra vars; Terraform's azurerm
-  # provider reads them from the process environment.
+  # and azuread providers read them from the process environment.
   environment:
     ARM_CLIENT_ID: "{{ ARM_CLIENT_ID }}"
     ARM_CLIENT_SECRET: "{{ ARM_CLIENT_SECRET }}"
@@ -13,7 +16,51 @@
   vars:
     tf_dir: "{{ playbook_dir }}/../terraform"
     tf_state: "{{ tf_state_dir | default('/var/lib/semaphore/tfstate') }}/{{ lab_name | default('avd-lab') }}.tfstate"
+    # Never used to create anything; only has to satisfy provider validation.
+    throwaway_password: "Unused-For-Destroy-1!"
   tasks:
+    - name: Look for the Terraform state
+      ansible.builtin.stat:
+        path: "{{ tf_state }}"
+      register: state_file
+
+    - name: Nothing to destroy
+      ansible.builtin.debug:
+        msg: "No state file at {{ tf_state }}; nothing to destroy."
+      when: not state_file.stat.exists
+
+    - name: Stop if there is no state
+      ansible.builtin.meta: end_play
+      when: not state_file.stat.exists
+
+    - name: Read the state
+      ansible.builtin.slurp:
+        src: "{{ tf_state }}"
+      register: state_raw
+      no_log: true
+
+    - name: Work out what is deployed from the state
+      ansible.builtin.set_fact:
+        deployed_session_hosts: >-
+          {{ (state.resources | selectattr('type', 'eq', 'azurerm_windows_virtual_machine')
+              | selectattr('name', 'eq', 'session_host') | map(attribute='instances') | flatten | length) }}
+        deployed_dc: >-
+          {{ (state.resources | selectattr('type', 'eq', 'azurerm_windows_virtual_machine')
+              | selectattr('name', 'eq', 'dc') | map(attribute='instances') | flatten | length) > 0 }}
+        deployed_test_users: >-
+          {{ (state.resources | selectattr('type', 'eq', 'azuread_user')
+              | map(attribute='instances') | flatten | length) }}
+      vars:
+        state: "{{ state_raw.content | b64decode | from_json }}"
+      no_log: true
+
+    - name: Show what will be destroyed
+      ansible.builtin.debug:
+        msg: >-
+          Destroying: {{ deployed_session_hosts }} session host(s),
+          {{ deployed_test_users }} Entra test user(s),
+          domain controller: {{ deployed_dc }}.
+
     - name: Write Terraform variables file
       ansible.builtin.copy:
         dest: "{{ tf_dir }}/lab.auto.tfvars.json"
@@ -22,12 +69,12 @@
       no_log: true
       vars:
         tf_vars:
-          admin_password: "{{ admin_password }}"
-          admin_source_cidr: "{{ admin_source_cidr | default('0.0.0.0/32') }}"
-          test_user_password: "{{ test_user_password | default('Unused-For-Destroy-1!') }}"
-          deploy_domain_controller: "{{ deploy_domain_controller | default(false) | bool }}"
-          test_user_count: "{{ test_user_count | default(50) | int }}"
-          session_host_count: "{{ session_host_count | default(2) | int }}"
+          admin_password: "{{ throwaway_password }}"
+          test_user_password: "{{ throwaway_password }}"
+          admin_source_cidr: "0.0.0.0/32"
+          session_host_count: "{{ deployed_session_hosts | int }}"
+          test_user_count: "{{ deployed_test_users | int }}"
+          deploy_domain_controller: "{{ deployed_dc | bool }}"
 
     - name: terraform init
       ansible.builtin.command:
