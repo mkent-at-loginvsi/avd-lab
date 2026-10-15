@@ -70,12 +70,13 @@ commit or share it.
   apply (required).
 - `admin_source_cidr` — your public IP/32; only this CIDR can reach 443 and
   22 (required).
-- `dns_hostname` — hostname for the appliance's public DNS name,
+- `dns_hostname` — the VM's hostname and its public DNS name,
   `<dns_hostname>.<location>.cloudapp.azure.com` (lowercase letters, digits,
   hyphens; must be unique in the region). Empty generates `le-<suffix>`. Shown in the
   `appliance_fqdn` output.
 - `appliance_domain_name` — passed to the appliance's `domainname` step. Empty
-  (the default) uses the public DNS name above, as Login VSI's sample `azure.yml` does.
+  (the default) uses the regional zone, `<location>.cloudapp.azure.com`, as Login VSI's
+  sample `azure.yml` does, so the appliance's own address is `<dns_hostname>.<zone>`.
   Changing it changes cloud-init, which makes Terraform replace the VM.
 - `vm_size` — default `Standard_D4s_v3` (4 vCPU / 8 GB, the documented
   minimum, Gen 1 capable). The OS disk is 128 GiB.
@@ -95,8 +96,8 @@ appliance password (`root` is not set by the cloud-init).
   `domainname`, `firstrun`); only the password and domain are templated.
 - Login VSI's sample `azure.yml` uses the VM's Azure DNS name (e.g.
   `westeurope.cloudapp.azure.com`) as the domain name. This template does the same by
-  default: it sets `dns_hostname` on the public IP and passes the resulting name to the
-  appliance. Set `appliance_domain_name` only if you want a different one.
+  default: it uses `dns_hostname` as both the VM hostname and the public IP's DNS label, and
+  passes the regional zone as the appliance's domain name. Set `appliance_domain_name` only if you want a different one.
 - The public IP and NSG are for a short-lived lab. For private-only
   access (ExpressRoute/VPN, as the docs describe) remove the public IP from
   `main.tf`.

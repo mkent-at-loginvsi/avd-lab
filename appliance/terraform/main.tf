@@ -10,11 +10,14 @@ locals {
   # minus the static-IP step: Azure hands out the address via DHCP.
   dns_label = var.dns_hostname != "" ? var.dns_hostname : "le-${random_id.suffix.hex}"
   # Azure's regional DNS zone is the lower-cased region name with no spaces (East US -> eastus).
-  appliance_fqdn = "${local.dns_label}.${lower(replace(var.location, " ", ""))}.cloudapp.azure.com"
+  # The appliance builds its own address as <hostname>.<domainname>, so the VM's hostname is the
+  # DNS label and the appliance's domain name is the regional zone, as in Login VSI's azure.yml.
+  dns_zone       = "${lower(replace(var.location, " ", ""))}.cloudapp.azure.com"
+  appliance_fqdn = "${local.dns_label}.${local.dns_zone}"
 
   userdata = templatefile("${path.module}/templates/userdata.yml", {
     adminpassword = base64encode(var.appliance_admin_password)
-    domainname    = var.appliance_domain_name != "" ? var.appliance_domain_name : local.appliance_fqdn
+    domainname    = var.appliance_domain_name != "" ? var.appliance_domain_name : local.dns_zone
   })
 }
 
@@ -155,7 +158,7 @@ resource "azurerm_image" "appliance" {
 
 resource "azurerm_linux_virtual_machine" "appliance" {
   name                            = "vm-leappliance"
-  computer_name                   = "leappliance"
+  computer_name                   = local.dns_label
   location                        = local.resource_group_location
   resource_group_name             = local.resource_group_name
   size                            = var.vm_size

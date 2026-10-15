@@ -40,7 +40,7 @@ variable "appliance_admin_password" {
 
 variable "dns_hostname" {
   type        = string
-  description = "Hostname for the appliance's public DNS name: <dns_hostname>.<location>.cloudapp.azure.com. Empty generates le-<suffix>."
+  description = "Hostname of the VM and its public DNS name: <dns_hostname>.<location>.cloudapp.azure.com. Empty generates le-<suffix>."
   default     = ""
 
   validation {
@@ -51,7 +51,7 @@ variable "dns_hostname" {
 
 variable "appliance_domain_name" {
   type        = string
-  description = "Domain name configured on the appliance during first run. Empty uses the public DNS name (<dns_hostname>.<location>.cloudapp.azure.com)."
+  description = "Domain name configured on the appliance during first run. Empty uses the regional zone (<location>.cloudapp.azure.com); the appliance's address is then <dns_hostname>.<zone>."
   default     = ""
 }
 

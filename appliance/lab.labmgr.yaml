@@ -34,7 +34,7 @@ variables:
 
   - name: appliance_domain_name
     type: string
-    description: Domain name configured on the appliance (the "domainname" cloud-init step). Empty uses the public DNS name.
+    description: Domain name configured on the appliance (the "domainname" cloud-init step). Empty uses the regional zone <region>.cloudapp.azure.com.
     default: ""
 
   - name: vm_admin_username
