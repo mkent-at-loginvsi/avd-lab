@@ -1,0 +1,54 @@
+---
+# Tears down the Login Enterprise appliance lab with no prompts. Terraform needs every variable
+# even on destroy, so this supplies throwaway (but validation-compliant) values.
+- name: Destroy the Login Enterprise appliance
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  environment:
+    ARM_CLIENT_ID: "{{ ARM_CLIENT_ID }}"
+    ARM_CLIENT_SECRET: "{{ ARM_CLIENT_SECRET }}"
+    ARM_SUBSCRIPTION_ID: "{{ ARM_SUBSCRIPTION_ID }}"
+    ARM_TENANT_ID: "{{ ARM_TENANT_ID }}"
+  vars:
+    tf_dir: "{{ playbook_dir }}/../terraform"
+    tf_state: "{{ tf_state_dir | default('/var/lib/semaphore/tfstate') }}/{{ lab_name | default('le-appliance') }}.tfstate"
+    throwaway_password: "Unused-For-Destroy-1!"
+  tasks:
+    - name: Look for the Terraform state
+      ansible.builtin.stat:
+        path: "{{ tf_state }}"
+      register: state_file
+
+    - name: Nothing to destroy
+      ansible.builtin.debug:
+        msg: "No state file at {{ tf_state }}; nothing to destroy."
+      when: not state_file.stat.exists
+
+    - name: Stop if there is no state
+      ansible.builtin.meta: end_play
+      when: not state_file.stat.exists
+
+    - name: Write Terraform variables file
+      ansible.builtin.copy:
+        dest: "{{ tf_dir }}/lab.auto.tfvars.json"
+        mode: "0600"
+        content: "{{ tf_vars | to_nice_json }}"
+      no_log: true
+      vars:
+        tf_vars:
+          vhd_source_url: "https://example.invalid/unused.vhd"
+          appliance_admin_password: "{{ throwaway_password }}"
+          vm_admin_password: "{{ throwaway_password }}"
+          admin_source_cidr: "0.0.0.0/32"
+
+    - name: terraform init
+      ansible.builtin.command:
+        cmd: terraform init -input=false -no-color
+        chdir: "{{ tf_dir }}"
+      changed_when: false
+
+    - name: terraform destroy
+      ansible.builtin.command:
+        cmd: terraform destroy -auto-approve -input=false -no-color -state={{ tf_state }}
+        chdir: "{{ tf_dir }}"

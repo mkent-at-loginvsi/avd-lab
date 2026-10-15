@@ -1,0 +1,13 @@
+#cloud-config
+write_files:
+# Set the password for the admin user (Base64-encoded)
+- content: |
+    ${adminpassword}
+  path: /home/admin/.password
+# Skip the initial step of the firstrun script
+- content: |
+    #Empty file
+  path: /loginvsi/first_run.chk
+runcmd:
+ - domainname ${domainname}
+ - /loginvsi/bin/firstrun

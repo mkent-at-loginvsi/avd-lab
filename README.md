@@ -9,8 +9,9 @@ users can sign in to AVD (web client / Windows App):
   (shared `test_user_password`) in a `SessionDesktop-*` group that has
   **Desktop Virtualization User** on the app group and **Virtual Machine User Login**
   on the resource group.
-- `deploy_domain_controller=true` additionally deploys a standalone AD forest (not
-  joined to the session hosts); default off.
+- `deploy_domain_controller=true` switches to AD mode: a DC, domain-joined session hosts and
+  AD test users synced to Entra with Cloud Sync (password hash sync), so sign-in is Entra
+  first, then the Windows Security prompt with the AD credentials. Default off.
 
 Files:
 - `ansible/deploy.yml` - Semaphore entrypoint: `terraform apply`, build inventory from
@@ -26,5 +27,23 @@ block automated sign-in. `test_user_password` must meet Entra password complexit
 
 Terraform state is stored at `/var/lib/semaphore/tfstate/avd-lab.tfstate` on the
 Semaphore host (a persistent volume).
+
+## Login Enterprise appliance (`appliance/`)
+
+Port of the Lab Manager `azure-loginenterprise-appliance` template: one Login Enterprise
+Linux appliance (Hyper-V Gen 1 VHD) - the VHD is copied server-side into a new storage
+account, turned into a managed image, and the VM is configured by cloud-init.
+
+- `appliance/terraform/` - the Terraform (own state, separate from the AVD lab).
+- `appliance/ansible/deploy.yml` / `destroy.yml` - Semaphore entrypoints; destroy needs no prompts.
+- `scripts/stage-vhd.sh` - one-time conversion of Login VSI's appliance zip into a VHD page
+  blob and a 7-day SAS URL to use as `vhd_source_url`.
+- State: `/var/lib/semaphore/tfstate/le-appliance.tfstate`.
+
+Deploy prompts: `vhd_source_url` (secret), `appliance_admin_password` (secret),
+`vm_admin_password` (secret), `admin_source_cidr`, optional `vm_size` (default
+`Standard_D4s_v3`, 4 vCPU) and `appliance_domain_name`. Uses the same `azure-avd-lab`
+Semaphore environment (Azure service principal). Each lab makes its own VHD copy, so the
+first apply is slow and destroy removes it. See `appliance/README.labmgr.md` for details.
 
 See `README.labmgr.md` for the original Lab Manager description.

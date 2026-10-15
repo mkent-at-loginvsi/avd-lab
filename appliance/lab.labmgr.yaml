@@ -1,0 +1,58 @@
+name: azure-loginenterprise-appliance
+description: >-
+  A single Login Enterprise virtual appliance (Linux, Hyper-V Gen 1 VHD)
+  deployed to Azure: the VHD is copied into a new storage account, turned into
+  a managed image, and the VM is configured on first boot through cloud-init
+  (admin password, domain name).
+default_ttl_hours: 8
+estimated_hourly_cost: 0.20
+variables:
+  - name: location
+    type: string
+    description: Azure region to deploy into
+    default: "eastus"
+
+  - name: resource_group_name
+    type: string
+    description: Resource group name (empty = generate one when creating)
+    default: ""
+
+  - name: vhd_source_url
+    type: string
+    secret: true
+    description: https URL to download the appliance Azure VHD from (Login VSI download link, or a SAS URL to your own copy); Azure copies it into the lab's storage account
+
+  - name: appliance_admin_password
+    type: string
+    secret: true
+    description: Password for the appliance's admin / root accounts (set via cloud-init)
+
+  - name: appliance_domain_name
+    type: string
+    description: Domain name configured on the appliance (the "domainname" cloud-init step), e.g. le.example.com
+    default: "le.labmgr.local"
+
+  - name: vm_admin_username
+    type: string
+    description: Azure VM admin account (separate from the appliance admin; cannot be "admin" or "root")
+    default: "azureadministrator"
+
+  - name: vm_admin_password
+    type: string
+    secret: true
+    description: Password for vm_admin_username (Azure requires 12+ characters with 3 of 4 character classes)
+
+  - name: admin_source_cidr
+    type: string
+    description: CIDR allowed to reach the appliance on HTTPS (443) and SSH (22), e.g. your workstation's public IP/32
+
+  - name: vm_size
+    type: string
+    description: VM size (appliance minimum is 4 vCPU / 8 GB RAM; must support Generation 1)
+    default: "Standard_D4s_v3"
+
+  - name: purpose
+    type: string
+    description: Why this lab exists (shows up as a resource tag)
+    tag: true
+    default: "loginenterprise-appliance"

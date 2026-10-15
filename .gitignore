@@ -4,3 +4,4 @@
 lab.auto.tfvars.json
 .env
 .env.*
+.terraform.lock.hcl
