@@ -11,7 +11,10 @@ users can sign in to AVD (web client / Windows App):
   on the resource group.
 - `deploy_domain_controller=true` switches to AD mode: a DC, domain-joined session hosts and
   AD test users synced to Entra with Cloud Sync (password hash sync), so sign-in is Entra
-  first, then the Windows Security prompt with the AD credentials. Default off.
+  first, then the Windows Security prompt with the AD credentials. Default off. The Graph calls run
+  as the service principal; registering the Cloud Sync agent on the DC needs a user, so create a
+  cloud account with only the Hybrid Identity Administrator role (e.g. `cloudsync-agent@<tenant>`)
+  and enter it at the `entra_admin_*` prompts. Global admins are blocked by security-defaults MFA.
 
 Files:
 - `ansible/deploy.yml` - Semaphore entrypoint: `terraform apply`, build inventory from

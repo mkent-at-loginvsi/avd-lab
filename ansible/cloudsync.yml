@@ -2,8 +2,8 @@
 # DC, configures the AD -> Entra sync (with password hash sync) through Graph, waits for the test
 # users to appear in Entra and adds them to the cloud group that holds the AVD role assignments.
 # The Graph calls run as the lab's service principal. Only the agent registration on the DC needs
-# a person: entra_admin_upn / entra_admin_password (a Hybrid Identity Administrator that is not
-# forced through MFA), prompted at run time.
+# a person: entra_admin_upn / entra_admin_password (a dedicated cloud account holding only the Hybrid Identity
+# Administrator role, which security defaults do not force through MFA), prompted at run time.
 - name: Enable directory sync for the tenant
   hosts: localhost
   connection: local
