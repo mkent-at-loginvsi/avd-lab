@@ -80,9 +80,9 @@ def get_user_token():
 
 def prep(tok):
     org = call("GET", f"{GRAPH}/beta/organization", tok)["value"][0]
-    if org.get("onPremisesSyncEnabled") is True:
-        print("directory sync already enabled")
-        return
+    # Always send the PATCH, even when the flag already reads true: it is what (re)creates the
+    # 'Microsoft Entra AD Synchronization Service' service principal, and without that principal
+    # the sync jobs quarantine with AzureDirectoryServiceAuthorizationFailed.
     call("PATCH", f"{GRAPH}/beta/organization/{org['id']}", tok, {"onPremisesSyncEnabled": True})
     print("enabled directory sync for the tenant")
 
