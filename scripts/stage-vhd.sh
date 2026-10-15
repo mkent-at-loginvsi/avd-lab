@@ -19,7 +19,7 @@ LOC=${2:?missing location}
 ZIP_URL=${3:?missing zip url}
 SA=${4:-stlevhdstg$(openssl rand -hex 3)}
 VM=vm-vhdstage-$(openssl rand -hex 2)
-VM_SIZE=${VM_SIZE:-Standard_D4s_v3}
+VM_SIZE=${VM_SIZE:-Standard_D4s_v4}
 CONTAINER=vhds
 BLOB=LoginEnterprise.vhd
 
