@@ -37,7 +37,8 @@
           location: "{{ location | default('eastus') }}"
           vhd_source_url: "{{ vhd_source_url }}"
           appliance_admin_password: "{{ appliance_admin_password }}"
-          appliance_domain_name: "{{ appliance_domain_name | default('le.labmgr.local') }}"
+          dns_hostname: "{{ dns_hostname | default('') }}"
+          appliance_domain_name: "{{ appliance_domain_name | default('') }}"
           vm_admin_username: "{{ vm_admin_username | default('azureadministrator') }}"
           vm_admin_password: "{{ vm_admin_password }}"
           admin_source_cidr: "{{ admin_source_cidr }}"
@@ -63,6 +64,13 @@
       register: appliance_ip
       changed_when: false
 
+    - name: Read the appliance DNS name
+      ansible.builtin.command:
+        cmd: terraform output -raw -state={{ tf_state }} appliance_fqdn
+        chdir: "{{ tf_dir }}"
+      register: appliance_fqdn
+      changed_when: false
+
     - name: Wait for the appliance web UI (first run takes several minutes)
       ansible.builtin.wait_for:
         host: "{{ appliance_ip.stdout }}"
@@ -77,6 +85,6 @@
     - name: Show where the appliance is
       ansible.builtin.debug:
         msg: >-
-          Appliance https://{{ appliance_ip.stdout }}
+          Appliance https://{{ appliance_fqdn.stdout }} ({{ appliance_ip.stdout }})
           ({{ 'web UI is answering' if not ui_wait.failed else 'web UI not reachable from Semaphore yet - check from your workstation' }}).
-          SSH as root or admin with the appliance password.
+          SSH as admin with the appliance password.

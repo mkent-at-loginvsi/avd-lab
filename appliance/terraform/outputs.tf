@@ -8,7 +8,12 @@ output "appliance_public_ip" {
   value       = azurerm_public_ip.appliance.ip_address
 }
 
+output "appliance_fqdn" {
+  description = "Public DNS name of the appliance"
+  value       = azurerm_public_ip.appliance.fqdn
+}
+
 output "appliance_url" {
   description = "Login Enterprise web UI (self-signed certificate until you replace it)"
-  value       = "https://${azurerm_public_ip.appliance.ip_address}"
+  value       = "https://${azurerm_public_ip.appliance.fqdn}"
 }

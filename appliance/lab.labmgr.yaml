@@ -27,10 +27,15 @@ variables:
     secret: true
     description: Password for the appliance's admin / root accounts (set via cloud-init)
 
+  - name: dns_hostname
+    type: string
+    description: Hostname for the public DNS name <hostname>.<region>.cloudapp.azure.com (empty = le-<random suffix>)
+    default: ""
+
   - name: appliance_domain_name
     type: string
-    description: Domain name configured on the appliance (the "domainname" cloud-init step), e.g. le.example.com
-    default: "le.labmgr.local"
+    description: Domain name configured on the appliance (the "domainname" cloud-init step). Empty uses the public DNS name.
+    default: ""
 
   - name: vm_admin_username
     type: string

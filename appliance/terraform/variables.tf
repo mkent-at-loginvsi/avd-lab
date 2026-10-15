@@ -38,10 +38,21 @@ variable "appliance_admin_password" {
   }
 }
 
+variable "dns_hostname" {
+  type        = string
+  description = "Hostname for the appliance's public DNS name: <dns_hostname>.<location>.cloudapp.azure.com. Empty generates le-<suffix>."
+  default     = ""
+
+  validation {
+    condition     = var.dns_hostname == "" || can(regex("^[a-z][a-z0-9-]{0,61}[a-z0-9]$", var.dns_hostname))
+    error_message = "dns_hostname must be 2-63 characters: lowercase letters, digits and hyphens, starting with a letter and not ending with a hyphen."
+  }
+}
+
 variable "appliance_domain_name" {
   type        = string
-  description = "Domain name configured on the appliance during first run"
-  default     = "le.labmgr.local"
+  description = "Domain name configured on the appliance during first run. Empty uses the public DNS name (<dns_hostname>.<location>.cloudapp.azure.com)."
+  default     = ""
 }
 
 variable "vm_admin_username" {

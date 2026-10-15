@@ -8,9 +8,13 @@ locals {
 
   # Same cloud-init shape as LoginVSI's vSphere example (Appliance-Terraform-vSphere-Example),
   # minus the static-IP step: Azure hands out the address via DHCP.
+  dns_label = var.dns_hostname != "" ? var.dns_hostname : "le-${random_id.suffix.hex}"
+  # Azure's regional DNS zone is the lower-cased region name with no spaces (East US -> eastus).
+  appliance_fqdn = "${local.dns_label}.${lower(replace(var.location, " ", ""))}.cloudapp.azure.com"
+
   userdata = templatefile("${path.module}/templates/userdata.yml", {
     adminpassword = base64encode(var.appliance_admin_password)
-    domainname    = var.appliance_domain_name
+    domainname    = var.appliance_domain_name != "" ? var.appliance_domain_name : local.appliance_fqdn
   })
 }
 
@@ -88,6 +92,7 @@ resource "azurerm_public_ip" "appliance" {
   resource_group_name = local.resource_group_name
   allocation_method   = "Static"
   sku                 = "Standard"
+  domain_name_label   = local.dns_label
   tags                = var.labmgr_tags
 }
 
