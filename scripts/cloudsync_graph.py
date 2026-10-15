@@ -67,14 +67,26 @@ def prep(tok):
     print("enabled directory sync for the tenant")
 
 
-def find_or_create_sp(tok, name):
+def find_sp(tok, name):
     q = urllib.parse.quote(f"displayName eq '{name}'")
     found = call("GET", f"{GRAPH}/beta/servicePrincipals?$filter={q}", tok).get("value", [])
-    if found:
-        return found[0]["id"]
+    return found[0]["id"] if found else None
+
+
+def find_or_create_sp(tok, name):
+    sp = find_sp(tok, name)
+    if sp:
+        return sp
     res = call("POST", f"{GRAPH}/beta/applicationTemplates/{AD2AAD_TEMPLATE}/instantiate", tok,
                {"displayName": name})
-    return res["servicePrincipal"]["id"]
+    # The response shape differs between API versions, so look the principal up by name.
+    sp = (res.get("servicePrincipal") or {}).get("id") or (res.get("servicePrincipal") or {}).get("objectId")
+    for _ in range(12):
+        sp = sp or find_sp(tok, name)
+        if sp:
+            return sp
+        time.sleep(10)
+    sys.exit("the AD2AAD service principal did not appear: " + json.dumps(res)[:400])
 
 
 def configure(tok):
