@@ -86,6 +86,8 @@
     ENTRA_DOMAIN: "{{ hostvars[groups['domain_controllers'][0]].entra_domain | default('') if groups['domain_controllers'] | default([]) | length > 0 else '' }}"
     ENTRA_GROUP_ID: "{{ hostvars[groups['domain_controllers'][0]].entra_group_object_id | default('') if groups['domain_controllers'] | default([]) | length > 0 else '' }}"
     TEST_USER_COUNT: "{{ test_user_count | default(50) }}"
+    ENTRA_ADMIN_UPN: "{{ entra_admin_upn | default('') }}"
+    ENTRA_ADMIN_PASSWORD: "{{ entra_admin_password | default('') }}"
   tasks:
     - name: Create the sync configuration, enable password hash sync and start it
       ansible.builtin.command: python3 {{ playbook_dir }}/../scripts/cloudsync_graph.py configure

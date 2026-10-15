@@ -2,8 +2,11 @@
 """Configure Microsoft Entra Cloud Sync (AD -> Entra) through Microsoft Graph and wait for the
 synced test users, then add them to the cloud group that holds the AVD role assignments.
 
-Stdlib only. Runs on the Semaphore controller and calls Graph as the lab's service principal
-(client-credentials flow) using ENTRA_TENANT_ID, ARM_CLIENT_ID and ARM_CLIENT_SECRET. The
+Stdlib only. Runs on the Semaphore controller. Most calls use the lab's service principal
+(client-credentials flow: ENTRA_TENANT_ID, ARM_CLIENT_ID, ARM_CLIENT_SECRET). The
+synchronization configuration API (secrets/jobs/schema/start) rejects application tokens with
+HTTP 401, so `configure` signs in as the Cloud Sync agent account instead
+(ENTRA_ADMIN_UPN / ENTRA_ADMIN_PASSWORD, a Hybrid Identity Administrator, password flow). The
 principal needs the Graph application roles Organization.ReadWrite.All,
 Application.ReadWrite.All, Synchronization.ReadWrite.All, User.ReadWrite.All and
 Group.ReadWrite.All (scripts/create-service-principal.sh grants them).
@@ -56,6 +59,23 @@ def get_token():
     except urllib.error.HTTPError as e:
         err = json.loads(e.read().decode(errors="replace") or "{}")
         sys.exit("token request failed: %s" % str(err.get("error_description", err))[:400])
+
+
+def get_user_token():
+    form = urllib.parse.urlencode({
+        "grant_type": "password",
+        "client_id": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",  # Azure CLI public client
+        "scope": GRAPH + "/.default",
+        "username": env("ENTRA_ADMIN_UPN"),
+        "password": env("ENTRA_ADMIN_PASSWORD"),
+    }).encode()
+    url = f"https://login.microsoftonline.com/{env('ENTRA_TENANT_ID')}/oauth2/v2.0/token"
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, data=form), timeout=60) as r:
+            return json.loads(r.read())["access_token"]
+    except urllib.error.HTTPError as e:
+        err = json.loads(e.read().decode(errors="replace") or "{}")
+        sys.exit("user token request failed: %s" % str(err.get("error_description", err))[:400])
 
 
 def prep(tok):
@@ -177,4 +197,6 @@ def assign(tok):
 
 
 if __name__ == "__main__":
-    {"prep": prep, "configure": configure, "assign": assign}[sys.argv[1]](get_token())
+    cmd = sys.argv[1]
+    {"prep": prep, "configure": configure, "assign": assign}[cmd](
+        get_user_token() if cmd == "configure" else get_token())
