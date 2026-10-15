@@ -43,7 +43,12 @@
 
     # Credentials travel in the task environment, not the script, so the real error can be shown
     # without exposing them.
+    # The cmdlets talk to the agent over a net.pipe endpoint that a WinRM network logon cannot
+    # open ("pipe name could not be obtained ... Access is denied"), so run them as SYSTEM.
     - name: Register the agent, create the gMSA and add the domain
+      become: true
+      become_method: ansible.builtin.runas
+      become_user: SYSTEM
       ansible.windows.win_powershell:
         script: |
           $ErrorActionPreference = 'Stop'
