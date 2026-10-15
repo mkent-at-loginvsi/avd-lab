@@ -2,9 +2,11 @@
 """Configure Microsoft Entra Cloud Sync (AD -> Entra) through Microsoft Graph and wait for the
 synced test users, then add them to the cloud group that holds the AVD role assignments.
 
-Stdlib only. Runs on the Semaphore controller. Credentials come from the environment:
-  ENTRA_TENANT_ID ENTRA_ADMIN_UPN ENTRA_ADMIN_PASSWORD (Hybrid Identity / Global Administrator
-  without MFA - the token is requested with the resource-owner password flow).
+Stdlib only. Runs on the Semaphore controller and calls Graph as the lab's service principal
+(client-credentials flow) using ENTRA_TENANT_ID, ARM_CLIENT_ID and ARM_CLIENT_SECRET. The
+principal needs the Graph application roles Organization.ReadWrite.All,
+Application.ReadWrite.All, Synchronization.ReadWrite.All, User.ReadWrite.All and
+Group.ReadWrite.All (scripts/create-service-principal.sh grants them).
 
 Subcommands:
   prep       enable the tenant's directory-sync flag
@@ -19,7 +21,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-CLI_CLIENT_ID = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"  # Azure CLI public client
 AD2AAD_TEMPLATE = "1a4721b3-e57f-4451-ae87-ef078703ec94"
 GRAPH = "https://graph.microsoft.com"
 env = os.environ.get
@@ -43,11 +44,10 @@ def call(method, url, token, body=None, ok=(200, 201, 202, 204)):
 
 def get_token():
     form = urllib.parse.urlencode({
-        "grant_type": "password",
-        "client_id": CLI_CLIENT_ID,
+        "grant_type": "client_credentials",
+        "client_id": env("ARM_CLIENT_ID"),
+        "client_secret": env("ARM_CLIENT_SECRET"),
         "scope": GRAPH + "/.default",
-        "username": env("ENTRA_ADMIN_UPN"),
-        "password": env("ENTRA_ADMIN_PASSWORD"),
     }).encode()
     url = f"https://login.microsoftonline.com/{env('ENTRA_TENANT_ID')}/oauth2/v2.0/token"
     try:
@@ -55,7 +55,7 @@ def get_token():
             return json.loads(r.read())["access_token"]
     except urllib.error.HTTPError as e:
         err = json.loads(e.read().decode(errors="replace") or "{}")
-        sys.exit("token request failed: %s" % err.get("error_description", err)[:400])
+        sys.exit("token request failed: %s" % str(err.get("error_description", err))[:400])
 
 
 def prep(tok):

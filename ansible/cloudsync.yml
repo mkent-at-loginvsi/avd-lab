@@ -1,16 +1,17 @@
 # Domain-controller mode only: installs the Microsoft Entra Cloud Sync provisioning agent on the
 # DC, configures the AD -> Entra sync (with password hash sync) through Graph, waits for the test
 # users to appear in Entra and adds them to the cloud group that holds the AVD role assignments.
-# Needs entra_admin_upn / entra_admin_password (a Hybrid Identity or Global Administrator without
-# MFA), prompted at run time.
+# The Graph calls run as the lab's service principal. Only the agent registration on the DC needs
+# a person: entra_admin_upn / entra_admin_password (a Hybrid Identity Administrator that is not
+# forced through MFA), prompted at run time.
 - name: Enable directory sync for the tenant
   hosts: localhost
   connection: local
   gather_facts: false
   environment: &graph_env
     ENTRA_TENANT_ID: "{{ ARM_TENANT_ID }}"
-    ENTRA_ADMIN_UPN: "{{ entra_admin_upn | default('') }}"
-    ENTRA_ADMIN_PASSWORD: "{{ entra_admin_password | default('') }}"
+    ARM_CLIENT_ID: "{{ ARM_CLIENT_ID }}"
+    ARM_CLIENT_SECRET: "{{ ARM_CLIENT_SECRET }}"
   tasks:
     - name: Enable the tenant's directory-sync flag
       ansible.builtin.command: python3 {{ playbook_dir }}/../scripts/cloudsync_graph.py prep
