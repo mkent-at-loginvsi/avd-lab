@@ -72,7 +72,7 @@ commit or share it.
   22 (required).
 - `dns_hostname` — the VM's hostname and its public DNS name,
   `<dns_hostname>.<location>.cloudapp.azure.com` (lowercase letters, digits,
-  hyphens; must be unique in the region). Empty generates `le-<suffix>`. Shown in the
+  hyphens; must be unique in the region). Default `leappliance`; empty generates `le-<suffix>`. Shown in the
   `appliance_fqdn` output.
 - `appliance_domain_name` — passed to the appliance's `domainname` step. Empty
   (the default) uses the regional zone, `<location>.cloudapp.azure.com`, as Login VSI's

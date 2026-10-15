@@ -41,7 +41,7 @@ variable "appliance_admin_password" {
 variable "dns_hostname" {
   type        = string
   description = "Hostname of the VM and its public DNS name: <dns_hostname>.<location>.cloudapp.azure.com. Empty generates le-<suffix>."
-  default     = ""
+  default     = "leappliance"
 
   validation {
     condition     = var.dns_hostname == "" || can(regex("^[a-z][a-z0-9-]{0,61}[a-z0-9]$", var.dns_hostname))

@@ -37,7 +37,7 @@
           location: "{{ location | default('eastus') }}"
           vhd_source_url: "{{ vhd_source_url }}"
           appliance_admin_password: "{{ appliance_admin_password }}"
-          dns_hostname: "{{ dns_hostname | default('') }}"
+          dns_hostname: "{{ dns_hostname | default('leappliance') }}"
           appliance_domain_name: "{{ appliance_domain_name | default('') }}"
           vm_admin_username: "{{ vm_admin_username | default('azureadministrator') }}"
           vm_admin_password: "{{ vm_admin_password }}"

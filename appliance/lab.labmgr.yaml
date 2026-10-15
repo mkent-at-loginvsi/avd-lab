@@ -30,7 +30,7 @@ variables:
   - name: dns_hostname
     type: string
     description: Hostname for the public DNS name <hostname>.<region>.cloudapp.azure.com (empty = le-<random suffix>)
-    default: ""
+    default: "leappliance"
 
   - name: appliance_domain_name
     type: string
