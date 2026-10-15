@@ -41,7 +41,7 @@
           vm_admin_username: "{{ vm_admin_username | default('azureadministrator') }}"
           vm_admin_password: "{{ vm_admin_password }}"
           admin_source_cidr: "{{ admin_source_cidr }}"
-          vm_size: "{{ vm_size | default('Standard_D4s_v3') }}"
+          vm_size: "{{ vm_size | default('Standard_D4s_v4') }}"
           labmgr_tags: "{{ tf_tags }}"
 
     - name: terraform init

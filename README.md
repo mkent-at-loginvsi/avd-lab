@@ -42,7 +42,7 @@ account, turned into a managed image, and the VM is configured by cloud-init.
 
 Deploy prompts: `vhd_source_url` (secret), `appliance_admin_password` (secret),
 `vm_admin_password` (secret), `admin_source_cidr`, optional `vm_size` (default
-`Standard_D4s_v3`, 4 vCPU) and `appliance_domain_name`. Uses the same `azure-avd-lab`
+`Standard_D4s_v4`, 4 vCPU) and `appliance_domain_name`. Uses the same `azure-avd-lab`
 Semaphore environment (Azure service principal). Each lab makes its own VHD copy, so the
 first apply is slow and destroy removes it. See `appliance/README.labmgr.md` for details.
 

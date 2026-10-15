@@ -64,7 +64,7 @@ variable "admin_source_cidr" {
 variable "vm_size" {
   type        = string
   description = "VM size; appliance minimum is 4 vCPU / 8 GB RAM and the size must support Generation 1 VMs"
-  default     = "Standard_D4s_v3"
+  default     = "Standard_D4s_v4"
 }
 
 variable "labmgr_tags" {
