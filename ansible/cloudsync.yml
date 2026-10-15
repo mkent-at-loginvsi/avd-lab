@@ -41,22 +41,35 @@
             throw 'provisioning agent files not found after install'
           }
 
+    # Credentials travel in the task environment, not the script, so the real error can be shown
+    # without exposing them.
     - name: Register the agent, create the gMSA and add the domain
       ansible.windows.win_powershell:
         script: |
           $ErrorActionPreference = 'Stop'
           if (Test-Path 'C:\Windows\Temp\cloudsync.registered') { return }
-          Import-Module '{{ agent_dir }}\Microsoft.CloudSync.PowerShell.dll'
-          $entra = New-Object System.Management.Automation.PSCredential('{{ entra_admin_upn }}',
-            (ConvertTo-SecureString '{{ entra_admin_password }}' -AsPlainText -Force))
-          $dom = New-Object System.Management.Automation.PSCredential('{{ ansible_user }}@{{ domain_name }}',
-            (ConvertTo-SecureString '{{ ansible_password }}' -AsPlainText -Force))
-          Connect-AADCloudSyncAzureAD -Credential $entra
-          Add-AADCloudSyncGMSA -Credential $dom
-          Add-AADCloudSyncADDomain -DomainName '{{ domain_name }}' -Credential $dom
-          Restart-Service -Name AADConnectProvisioningAgent
-          New-Item 'C:\Windows\Temp\cloudsync.registered' -ItemType File | Out-Null
-      no_log: true
+          try {
+            Import-Module '{{ agent_dir }}\Microsoft.CloudSync.PowerShell.dll'
+            $entra = New-Object System.Management.Automation.PSCredential($env:CS_ENTRA_UPN,
+              (ConvertTo-SecureString $env:CS_ENTRA_PW -AsPlainText -Force))
+            $dom = New-Object System.Management.Automation.PSCredential($env:CS_DOM_USER,
+              (ConvertTo-SecureString $env:CS_DOM_PW -AsPlainText -Force))
+            Connect-AADCloudSyncAzureAD -Credential $entra
+            Add-AADCloudSyncGMSA -Credential $dom
+            Add-AADCloudSyncADDomain -DomainName '{{ domain_name }}' -Credential $dom
+            Restart-Service -Name AADConnectProvisioningAgent
+            New-Item 'C:\Windows\Temp\cloudsync.registered' -ItemType File | Out-Null
+          } catch {
+            $e = $_.Exception
+            $msg = "$($e.GetType().FullName): $($e.Message)"
+            while ($e.InnerException) { $e = $e.InnerException; $msg += " <- $($e.GetType().FullName): $($e.Message)" }
+            throw "Cloud Sync registration failed at $($_.InvocationInfo.Line.Trim()): $msg"
+          }
+      environment:
+        CS_ENTRA_UPN: "{{ entra_admin_upn }}"
+        CS_ENTRA_PW: "{{ entra_admin_password }}"
+        CS_DOM_USER: "{{ ansible_user }}@{{ domain_name }}"
+        CS_DOM_PW: "{{ ansible_password }}"
 
 - name: Configure the sync, wait for the users and grant them AVD access
   hosts: localhost
