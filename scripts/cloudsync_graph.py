@@ -146,7 +146,7 @@ def configure(tok):
     changed = False
     for rule in schema.get("synchronizationRules", []):
         for om in rule.get("objectMappings", []):
-            if om.get("name", "").lower() in wanted and not any(
+            if (om.get("name") or "").lower() in wanted and not any(
                     a.get("targetAttributeName") == "CredentialData"
                     for a in om.get("attributeMappings", [])):
                 om["attributeMappings"].append(mapping)
