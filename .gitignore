@@ -5,3 +5,5 @@ lab.auto.tfvars.json
 .env
 .env.*
 .terraform.lock.hcl
+__pycache__/
+*.pyc
