@@ -74,3 +74,9 @@ variable "labmgr_tags" {
   description = "Tags applied to every taggable resource; populated by Lab Manager"
   default     = {}
 }
+
+variable "remote_apps" {
+  type        = map(string)
+  description = "RemoteApps to publish from the session hosts, as { \"Display name\" = \"C:\\\\path\\\\app.exe\" }. The program must already be installed on every session host. Empty publishes none."
+  default     = {}
+}

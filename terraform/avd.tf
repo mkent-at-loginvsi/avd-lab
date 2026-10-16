@@ -40,3 +40,37 @@ resource "azurerm_virtual_desktop_workspace_application_group_association" "lab"
   workspace_id         = azurerm_virtual_desktop_workspace.lab.id
   application_group_id = azurerm_virtual_desktop_application_group.desktop.id
 }
+
+# RemoteApps: a second application group on the same host pool, registered with the same
+# workspace. The apps must already be installed on the session hosts at the given paths.
+locals {
+  # Application resource names allow only letters, digits and hyphens here; the display name is kept as given.
+  remote_apps = { for name, path in var.remote_apps : replace(name, "/[^A-Za-z0-9]+/", "-") => { friendly_name = name, path = path } }
+}
+
+resource "azurerm_virtual_desktop_application_group" "remoteapp" {
+  count               = length(local.remote_apps) > 0 ? 1 : 0
+  name                = "rag-avdlab-${random_id.suffix.hex}"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
+  type                = "RemoteApp"
+  host_pool_id        = azurerm_virtual_desktop_host_pool.lab.id
+  friendly_name       = "AVD Lab Apps"
+  tags                = var.labmgr_tags
+}
+
+resource "azurerm_virtual_desktop_application" "app" {
+  for_each                     = local.remote_apps
+  name                         = each.key
+  application_group_id         = azurerm_virtual_desktop_application_group.remoteapp[0].id
+  friendly_name                = each.value.friendly_name
+  path                         = each.value.path
+  command_line_argument_policy = "DoNotAllow"
+  show_in_portal               = true
+}
+
+resource "azurerm_virtual_desktop_workspace_application_group_association" "remoteapp" {
+  count                = length(local.remote_apps) > 0 ? 1 : 0
+  workspace_id         = azurerm_virtual_desktop_workspace.lab.id
+  application_group_id = azurerm_virtual_desktop_application_group.remoteapp[0].id
+}

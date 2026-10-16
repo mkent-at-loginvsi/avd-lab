@@ -51,3 +51,12 @@ Semaphore environment (Azure service principal). Each lab makes its own VHD copy
 first apply is slow and destroy removes it. See `appliance/README.labmgr.md` for details.
 
 See `README.labmgr.md` for the original Lab Manager description.
+
+## Publishing a RemoteApp
+
+Deploy takes `remoteapp_name` and `remoteapp_path`. When the path is set, Terraform adds a
+RemoteApp application group (`rag-avdlab-*`) on the host pool, publishes that program, registers
+the group with the workspace and grants the `SessionDesktop-*` group (the same users as the
+desktop) the Desktop Virtualization User role on it. The program must already be installed at
+that path on every session host. Leave the path empty to publish no RemoteApp.
+

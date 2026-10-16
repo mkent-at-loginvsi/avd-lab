@@ -44,6 +44,14 @@ resource "azurerm_role_assignment" "group_desktop" {
   principal_id         = azuread_group.session_desktop.object_id
 }
 
+# The same group may launch the published RemoteApps.
+resource "azurerm_role_assignment" "group_remoteapp" {
+  count                = length(local.remote_apps) > 0 ? 1 : 0
+  scope                = azurerm_virtual_desktop_application_group.remoteapp[0].id
+  role_definition_name = "Desktop Virtualization User"
+  principal_id         = azuread_group.session_desktop.object_id
+}
+
 resource "azurerm_role_assignment" "group_vm_login" {
   count                = local.create_cloud_users ? 1 : 0
   scope                = azurerm_resource_group.lab.id
@@ -55,6 +63,13 @@ resource "azurerm_role_assignment" "group_vm_login" {
 resource "azurerm_role_assignment" "avd_user" {
   count                = var.avd_user_object_id != "" ? 1 : 0
   scope                = azurerm_virtual_desktop_application_group.desktop.id
+  role_definition_name = "Desktop Virtualization User"
+  principal_id         = var.avd_user_object_id
+}
+
+resource "azurerm_role_assignment" "avd_user_remoteapp" {
+  count                = var.avd_user_object_id != "" && length(local.remote_apps) > 0 ? 1 : 0
+  scope                = azurerm_virtual_desktop_application_group.remoteapp[0].id
   role_definition_name = "Desktop Virtualization User"
   principal_id         = var.avd_user_object_id
 }
