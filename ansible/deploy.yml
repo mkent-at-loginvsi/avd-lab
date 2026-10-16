@@ -45,7 +45,7 @@
           deploy_domain_controller: "{{ deploy_domain_controller | default(false) | bool }}"
           # One RemoteApp from two plain prompts (no JSON, so the path keeps its backslashes);
           # an empty path publishes no RemoteApp.
-          remote_apps: "{{ {remoteapp_name | default('') | trim or 'App': remoteapp_path} if (remoteapp_path | default('') | trim) != '' else {} }}"
+          remote_apps: "{{ {remoteapp_name | default('') | trim or 'App': {'path': remoteapp_path, 'arguments': remoteapp_arguments | default('') | trim}} if (remoteapp_path | default('') | trim) != '' else {} }}"
           test_user_count: "{{ test_user_count | default(50) | int }}"
           test_user_password: "{{ test_user_password }}"
           labmgr_tags: "{{ tf_tags }}"

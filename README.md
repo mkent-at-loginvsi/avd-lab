@@ -54,7 +54,8 @@ See `README.labmgr.md` for the original Lab Manager description.
 
 ## Publishing a RemoteApp
 
-Deploy takes `remoteapp_name` and `remoteapp_path`. When the path is set, Terraform adds a
+Deploy takes `remoteapp_name`, `remoteapp_path` and `remoteapp_arguments` (a fixed command line
+passed on every launch, e.g. the appliance URL; users can't change it). When the path is set, Terraform adds a
 RemoteApp application group (`rag-avdlab-*`) on the host pool, publishes that program, registers
 the group with the workspace and grants the `SessionDesktop-*` group (the same users as the
 desktop) the Desktop Virtualization User role on it. The program must already be installed at
