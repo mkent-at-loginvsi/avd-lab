@@ -44,7 +44,7 @@
           admin_source_cidr: "{{ admin_source_cidr }}"
           vm_size: "{{ vm_size | default('Standard_D4s_v4') }}"
           deploy_launcher: "{{ (deploy_launcher | default('false') | string | lower) in ['true', '1', 'yes'] }}"
-          launcher_vm_size: "{{ launcher_vm_size | default('Standard_B2s') }}"
+          launcher_vm_size: "{{ launcher_vm_size | default('Standard_D2as_v4') }}"
           labmgr_tags: "{{ tf_tags }}"
 
     - name: terraform init

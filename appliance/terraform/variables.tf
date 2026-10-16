@@ -93,5 +93,5 @@ variable "deploy_launcher" {
 variable "launcher_vm_size" {
   type        = string
   description = "Launcher VM size. Windows 11 needs at least 2 vCPU / 4 GB and a Gen 2 capable size."
-  default     = "Standard_B2s"
+  default     = "Standard_D2as_v4"
 }

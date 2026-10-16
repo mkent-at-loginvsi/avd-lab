@@ -75,7 +75,7 @@ commit or share it.
   hyphens; must be unique in the region). Default `leappliance`; empty generates `le-<suffix>`. Shown in the
   `appliance_fqdn` output.
 - `deploy_launcher` — also create a Windows 11 launcher VM (`vm-launcher`, default size
-  `launcher_vm_size` = `Standard_B2s`) in the appliance's subnet. RDP to its
+  `launcher_vm_size` = `Standard_D2as_v4`) in the appliance's subnet. RDP to its
   `launcher_public_ip` from `admin_source_cidr` as `vm_admin_username` / `vm_admin_password`;
   it reaches the appliance at the appliance's private address. Needs Windows client
   licensing (the VM sets `license_type = Windows_Client`). Turning it off on a later run
