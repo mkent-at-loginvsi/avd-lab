@@ -156,3 +156,84 @@ resource "azurerm_virtual_machine_extension" "session_host_aad" {
   type_handler_version       = "2.0"
   auto_upgrade_minor_version = true
 }
+
+# --- RemoteApp session hosts (second host pool) ---
+
+resource "azurerm_public_ip" "app_host" {
+  count               = var.app_host_count
+  name                = "pip-app-${count.index}-${random_id.suffix.hex}"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+  tags                = var.labmgr_tags
+}
+
+resource "azurerm_network_interface" "app_host" {
+  count               = var.app_host_count
+  name                = "nic-app-${count.index}-${random_id.suffix.hex}"
+  location            = azurerm_resource_group.lab.location
+  resource_group_name = azurerm_resource_group.lab.name
+  tags                = var.labmgr_tags
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.lab.id
+    private_ip_address_allocation = "Static"
+    private_ip_address            = local.app_host_ips[count.index]
+    public_ip_address_id          = azurerm_public_ip.app_host[count.index].id
+  }
+}
+
+resource "azurerm_windows_virtual_machine" "app_host" {
+  count                 = var.app_host_count
+  name                  = "vm-app-${count.index}"
+  computer_name         = "APP${count.index}"
+  location              = azurerm_resource_group.lab.location
+  resource_group_name   = azurerm_resource_group.lab.name
+  size                  = var.vm_size_app_host
+  admin_username        = var.admin_username
+  admin_password        = var.admin_password
+  network_interface_ids = [azurerm_network_interface.app_host[count.index].id]
+  tags                  = var.labmgr_tags
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "StandardSSD_LRS"
+  }
+
+  source_image_reference {
+    publisher = "MicrosoftWindowsDesktop"
+    offer     = "windows-11"
+    sku       = "win11-23h2-avd"
+    version   = "latest"
+  }
+}
+
+resource "azurerm_virtual_machine_extension" "app_host_winrm" {
+  count                      = var.app_host_count
+  name                       = "enable-winrm"
+  virtual_machine_id         = azurerm_windows_virtual_machine.app_host[count.index].id
+  publisher                  = "Microsoft.Compute"
+  type                       = "CustomScriptExtension"
+  type_handler_version       = "1.10"
+  auto_upgrade_minor_version = true
+
+  settings = jsonencode({
+    commandToExecute = "powershell -ExecutionPolicy Unrestricted -NonInteractive -Command \"${local.enable_winrm_command}\""
+  })
+}
+
+resource "azurerm_virtual_machine_extension" "app_host_aad" {
+  count                      = local.create_cloud_users ? var.app_host_count : 0
+  name                       = "AADLoginForWindows"
+  virtual_machine_id         = azurerm_windows_virtual_machine.app_host[count.index].id
+  publisher                  = "Microsoft.Azure.ActiveDirectory"
+  type                       = "AADLoginForWindows"
+  type_handler_version       = "2.0"
+  auto_upgrade_minor_version = true
+}

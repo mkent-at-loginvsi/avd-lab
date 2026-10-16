@@ -44,6 +44,9 @@
         deployed_session_hosts: >-
           {{ (state.resources | selectattr('type', 'eq', 'azurerm_windows_virtual_machine')
               | selectattr('name', 'eq', 'session_host') | map(attribute='instances') | flatten | length) }}
+        deployed_app_hosts: >-
+          {{ (state.resources | selectattr('type', 'eq', 'azurerm_windows_virtual_machine')
+              | selectattr('name', 'eq', 'app_host') | map(attribute='instances') | flatten | length) }}
         deployed_dc: >-
           {{ (state.resources | selectattr('type', 'eq', 'azurerm_windows_virtual_machine')
               | selectattr('name', 'eq', 'dc') | map(attribute='instances') | flatten | length) > 0 }}
@@ -58,6 +61,7 @@
       ansible.builtin.debug:
         msg: >-
           Destroying: {{ deployed_session_hosts }} session host(s),
+          {{ deployed_app_hosts }} RemoteApp host(s),
           {{ deployed_test_users }} Entra test user(s),
           domain controller: {{ deployed_dc }}.
 
@@ -73,6 +77,7 @@
           test_user_password: "{{ throwaway_password }}"
           admin_source_cidr: "0.0.0.0/32"
           session_host_count: "{{ deployed_session_hosts | int }}"
+          app_host_count: "{{ deployed_app_hosts | int }}"
           test_user_count: "{{ deployed_test_users | int }}"
           deploy_domain_controller: "{{ deployed_dc | bool }}"
 

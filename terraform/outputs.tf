@@ -11,6 +11,19 @@ locals {
     }
   }
 
+  app_host_hosts = {
+    for idx in range(var.app_host_count) :
+    azurerm_windows_virtual_machine.app_host[idx].name => {
+      ansible_host                         = azurerm_public_ip.app_host[idx].ip_address
+      ansible_user                         = var.admin_username
+      ansible_password                     = var.admin_password
+      ansible_connection                   = "winrm"
+      ansible_winrm_transport              = "basic"
+      ansible_port                         = 5985
+      ansible_winrm_server_cert_validation = "ignore"
+    }
+  }
+
   session_host_hosts = {
     for idx in range(var.session_host_count) :
     azurerm_windows_virtual_machine.session_host[idx].name => {
@@ -37,13 +50,17 @@ output "ansible_inventory" {
         session_hosts = {
           hosts = local.session_host_hosts
         }
+        app_hosts = {
+          hosts = local.app_host_hosts
+        }
       }
       vars = {
-        domain_name            = var.domain_name
-        entra_domain           = local.entra_domain
-        dc_private_ip          = local.dc_private_ip
-        entra_group_object_id  = azuread_group.session_desktop.object_id
-        avd_registration_token = azurerm_virtual_desktop_host_pool_registration_info.lab.token
+        domain_name                 = var.domain_name
+        entra_domain                = local.entra_domain
+        dc_private_ip               = local.dc_private_ip
+        entra_group_object_id       = azuread_group.session_desktop.object_id
+        avd_registration_token      = azurerm_virtual_desktop_host_pool_registration_info.lab.token
+        avd_apps_registration_token = var.app_host_count > 0 ? azurerm_virtual_desktop_host_pool_registration_info.apps[0].token : ""
       }
     }
   }

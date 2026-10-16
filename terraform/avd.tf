@@ -7,12 +7,36 @@ resource "azurerm_virtual_desktop_host_pool" "lab" {
   maximum_sessions_allowed = 10
   validate_environment     = false
   # Users assigned to both the desktop and a RemoteApp group only see the type chosen here.
-  preferred_app_group_type = var.preferred_app_group_type != "" ? var.preferred_app_group_type : (length(local.remote_apps) > 0 ? "RailApplications" : "Desktop")
+  # With a separate RemoteApp host pool this one just serves the desktop.
+  preferred_app_group_type = var.preferred_app_group_type != "" ? var.preferred_app_group_type : (length(local.remote_apps) > 0 && var.app_host_count == 0 ? "RailApplications" : "Desktop")
   start_vm_on_connect      = false
   # Entra-join: single sign-on to the Entra-joined host. Domain-joined: no SSO, so the user gets
   # the Windows Security prompt and signs in with their AD credentials.
   custom_rdp_properties = var.deploy_domain_controller ? "enablecredsspsupport:i:1;" : "targetisaadjoined:i:1;enablerdsaadauth:i:1;"
   tags                  = var.labmgr_tags
+}
+
+# Second host pool for RemoteApps. A user assigned to a desktop and a RemoteApp group on the SAME
+# host pool only sees one type, so the apps live in their own pool and users see both.
+resource "azurerm_virtual_desktop_host_pool" "apps" {
+  count                    = var.app_host_count > 0 ? 1 : 0
+  name                     = "hp-avdlab-apps-${random_id.suffix.hex}"
+  location                 = azurerm_resource_group.lab.location
+  resource_group_name      = azurerm_resource_group.lab.name
+  type                     = "Pooled"
+  load_balancer_type       = "BreadthFirst"
+  maximum_sessions_allowed = 10
+  validate_environment     = false
+  start_vm_on_connect      = false
+  preferred_app_group_type = "RailApplications"
+  custom_rdp_properties    = var.deploy_domain_controller ? "enablecredsspsupport:i:1;" : "targetisaadjoined:i:1;enablerdsaadauth:i:1;"
+  tags                     = var.labmgr_tags
+}
+
+resource "azurerm_virtual_desktop_host_pool_registration_info" "apps" {
+  count           = var.app_host_count > 0 ? 1 : 0
+  hostpool_id     = azurerm_virtual_desktop_host_pool.apps[0].id
+  expiration_date = timeadd(timestamp(), "24h")
 }
 
 resource "azurerm_virtual_desktop_host_pool_registration_info" "lab" {
@@ -56,7 +80,7 @@ resource "azurerm_virtual_desktop_application_group" "remoteapp" {
   location            = azurerm_resource_group.lab.location
   resource_group_name = azurerm_resource_group.lab.name
   type                = "RemoteApp"
-  host_pool_id        = azurerm_virtual_desktop_host_pool.lab.id
+  host_pool_id        = var.app_host_count > 0 ? azurerm_virtual_desktop_host_pool.apps[0].id : azurerm_virtual_desktop_host_pool.lab.id
   friendly_name       = "AVD Lab Apps"
   tags                = var.labmgr_tags
 }

@@ -41,6 +41,8 @@
           vm_size_dc: "{{ vm_size_dc | default('Standard_D2s_v4') }}"
           vm_size_session_host: "{{ vm_size_session_host | default('Standard_D2s_v4') }}"
           session_host_count: "{{ session_host_count | default(2) | int }}"
+          app_host_count: "{{ app_host_count | default(0) | int }}"
+          vm_size_app_host: "{{ vm_size_app_host | default('Standard_D2s_v4') }}"
           avd_user_object_id: "{{ avd_user_object_id | default('') }}"
           deploy_domain_controller: "{{ deploy_domain_controller | default(false) | bool }}"
           # One RemoteApp from two plain prompts (no JSON, so the path keeps its backslashes);
@@ -110,6 +112,33 @@
         entra_group_object_id: "{{ inv.all.vars.entra_group_object_id }}"
         avd_registration_token: "{{ inv.all.vars.avd_registration_token }}"
       loop: "{{ inv.all.children.session_hosts.hosts | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      vars:
+        inv: "{{ tf_inventory.stdout | from_json }}"
+      no_log: true
+
+    # The RemoteApp hosts are session hosts too (domain join + AVD agent run on the whole
+    # session_hosts group) but register with the second host pool's token.
+    - name: Add the RemoteApp hosts to the in-memory inventory
+      ansible.builtin.add_host:
+        name: "{{ item.key }}"
+        groups:
+          - session_hosts
+          - app_hosts
+        ansible_host: "{{ item.value.ansible_host }}"
+        ansible_user: "{{ item.value.ansible_user }}"
+        ansible_password: "{{ item.value.ansible_password }}"
+        ansible_connection: winrm
+        ansible_winrm_transport: basic
+        ansible_port: 5985
+        ansible_winrm_server_cert_validation: ignore
+        domain_name: "{{ inv.all.vars.domain_name }}"
+        entra_domain: "{{ inv.all.vars.entra_domain }}"
+        dc_private_ip: "{{ inv.all.vars.dc_private_ip }}"
+        entra_group_object_id: "{{ inv.all.vars.entra_group_object_id }}"
+        avd_registration_token: "{{ inv.all.vars.avd_apps_registration_token }}"
+      loop: "{{ inv.all.children.app_hosts.hosts | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
       vars:

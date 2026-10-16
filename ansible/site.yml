@@ -107,5 +107,50 @@
         arguments: "/quiet /norestart REGISTRATIONTOKEN={{ avd_registration_token }}"
         state: present
 
+# The published program is installed by hand on the first session host. A RemoteApp host needs the
+# same files, so copy them over (a few hundred KB) through the controller.
+- name: Fetch the Logon app from the first desktop session host
+  hosts: session_hosts:!app_hosts
+  gather_facts: false
+  run_once: true
+  vars:
+    logon_dir: "C:\\Logon"
+    logon_cache: "/tmp/avd-logon-cache"
+  tasks:
+    - name: Find the app files
+      ansible.windows.win_find:
+        paths: "{{ logon_dir }}"
+        file_type: file
+      register: logon_files
+      when: groups['app_hosts'] | default([]) | length > 0
+
+    - name: Fetch them to the controller
+      ansible.builtin.fetch:
+        src: "{{ item.path }}"
+        dest: "{{ logon_cache }}/"
+        flat: true
+      loop: "{{ logon_files.files | default([]) }}"
+      loop_control:
+        label: "{{ item.filename }}"
+      when: groups['app_hosts'] | default([]) | length > 0
+
+- name: Copy the Logon app to the RemoteApp hosts
+  hosts: app_hosts
+  gather_facts: false
+  vars:
+    logon_dir: "C:\\Logon"
+    logon_cache: "/tmp/avd-logon-cache"
+  tasks:
+    - name: Create the app folder
+      ansible.windows.win_file:
+        path: "{{ logon_dir }}"
+        state: directory
+
+    - name: Copy the app files
+      ansible.windows.win_copy:
+        src: "{{ item }}"
+        dest: "{{ logon_dir }}\\"
+      loop: "{{ lookup('ansible.builtin.fileglob', logon_cache + '/*', wantlist=True) }}"
+
 - name: Sync the AD users to Entra ID with Cloud Sync
   ansible.builtin.import_playbook: cloudsync.yml

@@ -8,6 +8,7 @@ locals {
   dc_private_ip         = cidrhost(local.subnet_address_prefix, 4)
   dc_count              = var.deploy_domain_controller ? 1 : 0
   session_host_ips      = [for i in range(var.session_host_count) : cidrhost(local.subnet_address_prefix, 10 + i)]
+  app_host_ips          = [for i in range(var.app_host_count) : cidrhost(local.subnet_address_prefix, 30 + i)]
 }
 
 resource "azurerm_resource_group" "lab" {

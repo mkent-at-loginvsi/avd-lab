@@ -66,5 +66,9 @@ that path on every session host. Leave the path empty to publish no RemoteApp.
 A user assigned to both the desktop and a RemoteApp group on one host pool sees only one type, set
 by the host pool's preferred application group type (`preferred_app_group_type`). It defaults to
 `RailApplications` (apps only, the Windows App "Apps" tab) when a RemoteApp is published, and
-`Desktop` otherwise. To offer both desktop and apps you need two host pools.
+`Desktop` otherwise. To offer both desktop and apps set `app_host_count` (e.g. 1): Terraform then creates a second,
+RemoteApp-only host pool (`hp-avdlab-apps-*`) with its own session host(s) (`vm-app-N`, hostnames
+`APPn`, `vm_size_app_host`), the RemoteApp group moves to it, and the first pool keeps serving the
+desktop, so users see both. The playbook copies the program's folder (`C:\Logon`) from the first
+desktop host to the app hosts, so install the program on `vm-sh-0` first.
 

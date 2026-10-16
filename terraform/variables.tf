@@ -96,3 +96,15 @@ variable "preferred_app_group_type" {
     error_message = "preferred_app_group_type must be empty, Desktop, RailApplications or None."
   }
 }
+
+variable "app_host_count" {
+  type        = number
+  description = "Session hosts in a second, RemoteApp-only host pool. 0 keeps everything in one host pool (then users see either the desktop or the apps, per preferred_app_group_type)."
+  default     = 0
+}
+
+variable "vm_size_app_host" {
+  type        = string
+  description = "VM size of the RemoteApp host pool's session hosts"
+  default     = "Standard_D2s_v4"
+}
