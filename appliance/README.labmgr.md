@@ -74,6 +74,12 @@ commit or share it.
   `<dns_hostname>.<location>.cloudapp.azure.com` (lowercase letters, digits,
   hyphens; must be unique in the region). Default `leappliance`; empty generates `le-<suffix>`. Shown in the
   `appliance_fqdn` output.
+- `deploy_launcher` — also create a Windows 11 launcher VM (`vm-launcher`, default size
+  `launcher_vm_size` = `Standard_B2s`) in the appliance's subnet. RDP to its
+  `launcher_public_ip` from `admin_source_cidr` as `vm_admin_username` / `vm_admin_password`;
+  it reaches the appliance at the appliance's private address. Needs Windows client
+  licensing (the VM sets `license_type = Windows_Client`). Turning it off on a later run
+  destroys the launcher.
 - `appliance_domain_name` — passed to the appliance's `domainname` step. Empty
   (the default) uses the regional zone, `<location>.cloudapp.azure.com`, as Login VSI's
   sample `azure.yml` does, so the appliance's own address is `<dns_hostname>.<zone>`.

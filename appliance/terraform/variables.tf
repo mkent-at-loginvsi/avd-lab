@@ -83,3 +83,15 @@ variable "labmgr_tags" {
   description = "Tags applied to every taggable resource; populated by Lab Manager"
   default     = {}
 }
+
+variable "deploy_launcher" {
+  type        = bool
+  description = "Also deploy a Windows 11 launcher VM in the appliance's network (RDP from admin_source_cidr)"
+  default     = false
+}
+
+variable "launcher_vm_size" {
+  type        = string
+  description = "Launcher VM size. Windows 11 needs at least 2 vCPU / 4 GB and a Gen 2 capable size."
+  default     = "Standard_B2s"
+}
