@@ -85,3 +85,14 @@ variable "remote_apps" {
   description = "RemoteApps to publish from the session hosts: display name => { path, arguments, icon_path, icon_index }. The icon comes from a file on the session host (default: the program's own icon). The program must already be installed on every session host. A non-empty arguments value is passed on every launch and users cannot change it. Empty map publishes none."
   default     = {}
 }
+
+variable "preferred_app_group_type" {
+  type        = string
+  description = "Which application group type users see when they are assigned both a desktop and a RemoteApp group on the host pool: Desktop, RailApplications or None. Empty = RailApplications when a RemoteApp is published, otherwise Desktop."
+  default     = ""
+
+  validation {
+    condition     = contains(["", "Desktop", "RailApplications", "None"], var.preferred_app_group_type)
+    error_message = "preferred_app_group_type must be empty, Desktop, RailApplications or None."
+  }
+}

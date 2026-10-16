@@ -63,3 +63,8 @@ the group with the workspace and grants the `SessionDesktop-*` group (the same u
 desktop) the Desktop Virtualization User role on it. The program must already be installed at
 that path on every session host. Leave the path empty to publish no RemoteApp.
 
+A user assigned to both the desktop and a RemoteApp group on one host pool sees only one type, set
+by the host pool's preferred application group type (`preferred_app_group_type`). It defaults to
+`RailApplications` (apps only, the Windows App "Apps" tab) when a RemoteApp is published, and
+`Desktop` otherwise. To offer both desktop and apps you need two host pools.
+

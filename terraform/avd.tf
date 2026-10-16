@@ -6,6 +6,8 @@ resource "azurerm_virtual_desktop_host_pool" "lab" {
   load_balancer_type       = "BreadthFirst"
   maximum_sessions_allowed = 10
   validate_environment     = false
+  # Users assigned to both the desktop and a RemoteApp group only see the type chosen here.
+  preferred_app_group_type = var.preferred_app_group_type != "" ? var.preferred_app_group_type : (length(local.remote_apps) > 0 ? "RailApplications" : "Desktop")
   start_vm_on_connect      = false
   # Entra-join: single sign-on to the Entra-joined host. Domain-joined: no SSO, so the user gets
   # the Windows Security prompt and signs in with their AD credentials.

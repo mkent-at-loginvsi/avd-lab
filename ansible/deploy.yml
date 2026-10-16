@@ -46,6 +46,7 @@
           # One RemoteApp from two plain prompts (no JSON, so the path keeps its backslashes);
           # an empty path publishes no RemoteApp.
           remote_apps: "{{ {remoteapp_name | default('') | trim or 'App': {'path': remoteapp_path, 'arguments': remoteapp_arguments | default('') | trim, 'icon_path': remoteapp_icon_path | default('') | trim, 'icon_index': remoteapp_icon_index | default(0) | int}} if (remoteapp_path | default('') | trim) != '' else {} }}"
+          preferred_app_group_type: "{{ preferred_app_group_type | default('') }}"
           test_user_count: "{{ test_user_count | default(50) | int }}"
           test_user_password: "{{ test_user_password }}"
           labmgr_tags: "{{ tf_tags }}"
