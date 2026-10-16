@@ -77,9 +77,11 @@ variable "labmgr_tags" {
 
 variable "remote_apps" {
   type = map(object({
-    path      = string
-    arguments = optional(string, "")
+    path       = string
+    arguments  = optional(string, "")
+    icon_path  = optional(string, "")
+    icon_index = optional(number, 0)
   }))
-  description = "RemoteApps to publish from the session hosts: display name => { path, arguments }. The program must already be installed on every session host. A non-empty arguments value is passed on every launch and users cannot change it. Empty map publishes none."
+  description = "RemoteApps to publish from the session hosts: display name => { path, arguments, icon_path, icon_index }. The icon comes from a file on the session host (default: the program's own icon). The program must already be installed on every session host. A non-empty arguments value is passed on every launch and users cannot change it. Empty map publishes none."
   default     = {}
 }

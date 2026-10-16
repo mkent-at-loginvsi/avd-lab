@@ -45,7 +45,7 @@ resource "azurerm_virtual_desktop_workspace_application_group_association" "lab"
 # workspace. The apps must already be installed on the session hosts at the given paths.
 locals {
   # Application resource names allow only letters, digits and hyphens here; the display name is kept as given.
-  remote_apps = { for name, app in var.remote_apps : replace(name, "/[^A-Za-z0-9]+/", "-") => { friendly_name = name, path = app.path, arguments = app.arguments } }
+  remote_apps = { for name, app in var.remote_apps : replace(name, "/[^A-Za-z0-9]+/", "-") => { friendly_name = name, path = app.path, arguments = app.arguments, icon_path = app.icon_path, icon_index = app.icon_index } }
 }
 
 resource "azurerm_virtual_desktop_application_group" "remoteapp" {
@@ -65,6 +65,8 @@ resource "azurerm_virtual_desktop_application" "app" {
   application_group_id         = azurerm_virtual_desktop_application_group.remoteapp[0].id
   friendly_name                = each.value.friendly_name
   path                         = each.value.path
+  icon_path                    = each.value.icon_path != "" ? each.value.icon_path : each.value.path
+  icon_index                   = each.value.icon_index
   command_line_argument_policy = each.value.arguments != "" ? "Require" : "DoNotAllow"
   command_line_arguments       = each.value.arguments != "" ? each.value.arguments : null
   show_in_portal               = true
