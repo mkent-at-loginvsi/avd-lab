@@ -30,9 +30,11 @@
     - name: Add the Entra tenant domain as a UPN suffix of the forest
       ansible.windows.win_powershell:
         script: |
+          $Ansible.Changed = $false
           $suffix = '{{ entra_domain }}'
           if ((Get-ADForest).UPNSuffixes -notcontains $suffix) {
             Set-ADForest -Identity (Get-ADForest) -UPNSuffixes @{Add = $suffix}
+            $Ansible.Changed = $true
           }
 
     - name: Create the SessionDesktop AD group
@@ -47,6 +49,8 @@
         name: "testuser{{ '%02d' | format(item) }}"
         upn: "testuser{{ '%02d' | format(item) }}@{{ entra_domain }}"
         password: "{{ test_user_password }}"
+        # Without this the module resets the password on every run and always reports changed.
+        update_password: on_create
         password_never_expires: true
         enabled: true
         state: present
@@ -122,7 +126,7 @@
         paths: "{{ logon_dir }}"
         file_type: file
       register: logon_files
-      when: groups['app_hosts'] | default([]) | length > 0
+      when: (groups['app_hosts'] | default([]) | length > 0) or (logon_script_enabled | default(false) | bool)
 
     - name: Fetch them to the controller
       ansible.builtin.fetch:
@@ -132,7 +136,7 @@
       loop: "{{ logon_files.files | default([]) }}"
       loop_control:
         label: "{{ item.filename }}"
-      when: groups['app_hosts'] | default([]) | length > 0
+      when: (groups['app_hosts'] | default([]) | length > 0) or (logon_script_enabled | default(false) | bool)
 
 - name: Copy the Logon app to the RemoteApp hosts
   hosts: app_hosts
@@ -151,6 +155,47 @@
         src: "{{ item }}"
         dest: "{{ logon_dir }}\\"
       loop: "{{ lookup('ansible.builtin.fileglob', logon_cache + '/*', wantlist=True) }}"
+
+# Optional: run the Logon app as a domain logon script (AD user Profile tab -> Logon script), per
+# https://docs.loginvsi.com/login-enterprise/6.9/configuring-logon-processor-as-a-logon-script
+# The exe must live in NETLOGON; scriptPath is read from AD by the session host at sign-in, so it
+# needs no Entra sync. Needs logon_script_enabled=true and logon_script_url (the appliance URL).
+- name: Publish the Logon app as a domain logon script
+  hosts: domain_controllers
+  gather_facts: false
+  vars:
+    logon_cache: "/tmp/avd-logon-cache"
+    netlogon_dir: "C:\\Windows\\SYSVOL\\sysvol\\{{ domain_name }}\\scripts"
+    # Relative to NETLOGON, as in the Login VSI docs screenshot (not a UNC path).
+    logon_script_path: "LoginPI.Logon.exe {{ logon_script_url | default('') }}"
+  tasks:
+    - name: Run only when the logon script is enabled
+      ansible.builtin.meta: end_host
+      when: not (logon_script_enabled | default(false) | bool)
+
+    - name: Require the appliance URL
+      ansible.builtin.assert:
+        that: logon_script_url | default('') | trim != ''
+        fail_msg: logon_script_url (the Login Enterprise appliance URL) is required when logon_script_enabled is true
+
+    - name: Copy the Logon app into NETLOGON
+      ansible.windows.win_copy:
+        src: "{{ item }}"
+        dest: "{{ netlogon_dir }}\\"
+      loop: "{{ lookup('ansible.builtin.fileglob', logon_cache + '/*', wantlist=True) }}"
+
+    - name: Set the logon script on each test user
+      ansible.windows.win_powershell:
+        script: |
+          $Ansible.Changed = $false
+          $want = '{{ logon_script_path }}'
+          foreach ($n in 1..{{ test_user_count | int }}) {
+            $u = Get-ADUser -Identity ('testuser{0:D2}' -f $n) -Properties ScriptPath
+            if ($u.ScriptPath -ne $want) {
+              Set-ADUser -Identity $u -ScriptPath $want
+              $Ansible.Changed = $true
+            }
+          }
 
 - name: Sync the AD users to Entra ID with Cloud Sync
   ansible.builtin.import_playbook: cloudsync.yml

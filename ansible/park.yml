@@ -1,0 +1,149 @@
+---
+# Parks (deallocates) or unparks (starts) every VM in the AVD lab and the Login Enterprise
+# appliance lab, so compute stops billing while the labs are idle. Disks, IPs and the rest of
+# the lab stay in place; only VM compute is released.
+#
+# Labs are found by tag, not Terraform state: any resource group tagged managed_by=semaphore
+# (both Terraform stacks apply that tag). Needs only the environment's ARM_* credentials.
+#
+#   power_action  park (default) | unpark
+#   park_dry_run  true lists what would change and does nothing
+#   arm_token     optional pre-made ARM bearer token (skips the service principal login)
+- name: Park or unpark the labs
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    arm: "https://management.azure.com"
+    sub: "{{ ARM_SUBSCRIPTION_ID }}"
+    power: "{{ power_action | default('park') }}"
+    dry_run: "{{ park_dry_run | default(false) | bool }}"
+  tasks:
+    - name: Check the action
+      ansible.builtin.assert:
+        that: power in ['park', 'unpark']
+        fail_msg: "power_action must be 'park' or 'unpark', got '{{ power }}'"
+
+    - name: Sign in with the service principal
+      ansible.builtin.uri:
+        url: "https://login.microsoftonline.com/{{ ARM_TENANT_ID }}/oauth2/v2.0/token"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ ARM_CLIENT_ID }}"
+          client_secret: "{{ ARM_CLIENT_SECRET }}"
+          scope: "{{ arm }}/.default"
+      register: login
+      no_log: true
+      when: arm_token is not defined
+
+    - name: Keep the bearer token
+      ansible.builtin.set_fact:
+        auth: { Authorization: "Bearer {{ arm_token | default(login.json.access_token) }}" }
+      no_log: true
+
+    - name: Find the lab resource groups
+      ansible.builtin.uri:
+        url: "{{ arm }}/subscriptions/{{ sub }}/resourcegroups?api-version=2021-04-01&$filter={{ \"tagName eq 'managed_by' and tagValue eq 'semaphore'\" | urlencode }}"
+        headers: "{{ auth }}"
+      register: rgs
+
+    - name: List the VMs in them
+      ansible.builtin.uri:
+        url: "{{ arm }}/subscriptions/{{ sub }}/resourceGroups/{{ item.name }}/providers/Microsoft.Compute/virtualMachines?api-version=2024-03-01"
+        headers: "{{ auth }}"
+      loop: "{{ rgs.json.value }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: vm_lists
+
+    # Domain controllers first when starting, so the session hosts can find the domain.
+    - name: Build the VM list
+      ansible.builtin.set_fact:
+        vms: >-
+          {{ vm_lists.results | map(attribute='json.value') | flatten
+             | sort(attribute='name') }}
+        dcs: >-
+          {{ vm_lists.results | map(attribute='json.value') | flatten
+             | selectattr('name', 'search', '(^|-)dc$') | list }}
+
+    - name: Show the targets
+      ansible.builtin.debug:
+        msg: "{{ power }}{{ ' (dry run)' if dry_run else '' }}: {{ vms | map(attribute='id') | map('regex_replace', '.*/resourceGroups/', '') | list }}"
+
+    - name: Nothing found
+      ansible.builtin.meta: end_play
+      when: vms | length == 0 or dry_run
+
+    - name: Deallocate the VMs
+      ansible.builtin.uri:
+        url: "{{ arm }}{{ item.id }}/deallocate?api-version=2024-03-01"
+        method: POST
+        headers: "{{ auth }}"
+        status_code: [200, 202]
+      loop: "{{ vms }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: power == 'park'
+
+    - name: Wait until every VM is deallocated
+      ansible.builtin.uri:
+        url: "{{ arm }}{{ item.id }}/instanceView?api-version=2024-03-01"
+        headers: "{{ auth }}"
+      loop: "{{ vms }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: parked
+      until: "'PowerState/deallocated' in (parked.json.statuses | map(attribute='code') | list)"
+      retries: 60
+      delay: 10
+      when: power == 'park'
+
+    - name: Start the domain controller first
+      ansible.builtin.uri:
+        url: "{{ arm }}{{ item.id }}/start?api-version=2024-03-01"
+        method: POST
+        headers: "{{ auth }}"
+        status_code: [200, 202]
+      loop: "{{ dcs }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: power == 'unpark'
+
+    - name: Wait for the domain controller
+      ansible.builtin.uri:
+        url: "{{ arm }}{{ item.id }}/instanceView?api-version=2024-03-01"
+        headers: "{{ auth }}"
+      loop: "{{ dcs }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: dc_up
+      until: "'PowerState/running' in (dc_up.json.statuses | map(attribute='code') | list)"
+      retries: 60
+      delay: 10
+      when: power == 'unpark'
+
+    - name: Start the other VMs
+      ansible.builtin.uri:
+        url: "{{ arm }}{{ item.id }}/start?api-version=2024-03-01"
+        method: POST
+        headers: "{{ auth }}"
+        status_code: [200, 202]
+      loop: "{{ vms | difference(dcs) }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: power == 'unpark'
+
+    - name: Wait until every VM is running
+      ansible.builtin.uri:
+        url: "{{ arm }}{{ item.id }}/instanceView?api-version=2024-03-01"
+        headers: "{{ auth }}"
+      loop: "{{ vms }}"
+      loop_control:
+        label: "{{ item.name }}"
+      register: started
+      until: "'PowerState/running' in (started.json.statuses | map(attribute='code') | list)"
+      retries: 60
+      delay: 10
+      when: power == 'unpark'
