@@ -1,0 +1,7 @@
+---
+# Starts every parked lab VM. Same logic as park.yml with power_action=unpark, so the Semaphore
+# template needs no extra arguments.
+- name: Unpark the labs
+  ansible.builtin.import_playbook: park.yml
+  vars:
+    power_action: unpark
